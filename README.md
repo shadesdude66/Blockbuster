@@ -7,6 +7,7 @@
 
 ![Detail view](screenshots/detail-view.png)
 ![Stats view](screenshots/stats-view.png)
+![Full-window list view with poster and tags](screenshots/list-fullscreen.png)
 
 </details>
 
