@@ -121,7 +121,7 @@ def download_poster(poster_url: str, imdb_id: str) -> str | None:
     filename = f"{imdb_id}.{ext}"
     dest = config.POSTER_DIR / filename
     try:
-        req = urllib.request.Request(poster_url, headers={"User-Agent": "movie-tracker/1.0"})
+        req = urllib.request.Request(poster_url, headers={"User-Agent": "blockbuster/1.0"})
         with urllib.request.urlopen(req, timeout=10) as resp:
             dest.write_bytes(resp.read())
     except urllib.error.URLError:

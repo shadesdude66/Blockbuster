@@ -1,4 +1,4 @@
-"""SQLite storage layer for movie tracker."""
+"""SQLite storage layer for Blockbuster."""
 
 import os
 import sqlite3

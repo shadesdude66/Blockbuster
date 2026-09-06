@@ -1,4 +1,4 @@
-# Movie Tracker
+# Blockbuster
 
 ![List view](screenshots/list-view.png)
 
@@ -41,36 +41,36 @@ cd movie-tracker
 python3 -m movie_tracker
 ```
 
-That's enough to run it. If you'd like a `movie-tracker` command on your
+That's enough to run it. If you'd like a `blockbuster` command on your
 `PATH` instead of typing the above every time:
 
 ```
 mkdir -p ~/.local/bin
-cat > ~/.local/bin/movie-tracker <<'EOF'
+cat > ~/.local/bin/blockbuster <<'EOF'
 #!/usr/bin/env python3
 import sys
 from pathlib import Path
 
-sys.path.insert(0, "/full/path/to/movie-tracker")  # wherever you cloned it
+sys.path.insert(0, "/full/path/to/blockbuster")  # wherever you cloned it
 
 from movie_tracker.ui import main
 
 if __name__ == "__main__":
     main()
 EOF
-chmod +x ~/.local/bin/movie-tracker
+chmod +x ~/.local/bin/blockbuster
 ```
 
 (Make sure `~/.local/bin` is on your `PATH`.) Optionally, add it to your
 app launcher with a `.desktop` file (Linux):
 
 ```
-cat > ~/.local/share/applications/movie-tracker.desktop <<'EOF'
+cat > ~/.local/share/applications/blockbuster.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
-Name=Movie Tracker
+Name=Blockbuster
 Comment=Track movies you've watched: ratings, rank, runtime, posters
-Exec=kitty --title movie-tracker -e movie-tracker
+Exec=kitty --title blockbuster -e blockbuster
 Terminal=false
 Icon=video-x-generic
 Categories=AudioVideo;Video;Database;
@@ -83,7 +83,7 @@ gets you live poster images, per the note above.)
 ## Run it
 
 ```
-movie-tracker
+blockbuster
 ```
 
 ## Adding movies & TV series
@@ -102,7 +102,7 @@ movie-tracker
 Online search needs a free OMDb API key: get one instantly at
 https://www.omdbapi.com/apikey.aspx (check your email to activate it),
 then press `K` in the app to save it. It's stored in
-`~/.config/movie-tracker/config.json` (or set the `OMDB_API_KEY`
+`~/.config/blockbuster/config.json` (or set the `OMDB_API_KEY`
 environment variable instead).
 
 ## Everyday keys
@@ -160,13 +160,13 @@ Inside a movie's detail screen:
 
 ## Data
 
-- SQLite database: `~/.local/share/movie-tracker/movies.db`
-- Cached poster images: `~/.local/share/movie-tracker/posters/`
-- Config (API key): `~/.config/movie-tracker/config.json`
-- Manual backups (`B`): `~/.local/share/movie-tracker/backups/`
-- Exports (`X`): `~/.local/share/movie-tracker/exports/`
+- SQLite database: `~/.local/share/blockbuster/movies.db`
+- Cached poster images: `~/.local/share/blockbuster/posters/`
+- Config (API key): `~/.config/blockbuster/config.json`
+- Manual backups (`B`): `~/.local/share/blockbuster/backups/`
+- Exports (`X`): `~/.local/share/blockbuster/exports/`
 
-Back up or sync `~/.local/share/movie-tracker/movies.db` if you want to
+Back up or sync `~/.local/share/blockbuster/movies.db` if you want to
 keep your data safe across machines — or just press `B` in the app for a
 timestamped copy. Deleting a movie (`d`/`x`) doesn't remove its row —
 it's hidden until you either restore it (`u`, or from the `T` trash

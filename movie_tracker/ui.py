@@ -1,4 +1,4 @@
-"""Curses TUI for movie tracker."""
+"""Curses TUI for Blockbuster."""
 
 import csv
 import curses
@@ -492,7 +492,7 @@ def show_help_screen(stdscr) -> None:
     else:
         body_lines = left_col + [""] + right_col
 
-    lines = ["MOVIE TRACKER - KEYS", ""]
+    lines = ["BLOCKBUSTER - KEYS", ""]
     lines.extend(body_lines)
     lines.append("")
     wrap_w = max(w - 4, 20)
@@ -1783,7 +1783,7 @@ class App:
             divider_x = None
             content_w = interior_right + 1
 
-        header = " MOVIE TRACKER "
+        header = " BLOCKBUSTER "
         _, sort_dir = SORT_FIELDS.get(self.sort, SORT_FIELDS["rank"])
         sort_arrow = "▲" if sort_dir == "asc" else "▼"
         sub = f"sort:{self.sort}{sort_arrow}  status:{self.status_filter or 'all'}"
