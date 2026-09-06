@@ -46,12 +46,12 @@ That's enough to run it. If you'd like a `blockbuster` command on your
 
 ```
 mkdir -p ~/.local/bin
-cat > ~/.local/bin/blockbuster <<'EOF'
+cat > ~/.local/bin/blockbuster <<EOF
 #!/usr/bin/env python3
 import sys
 from pathlib import Path
 
-sys.path.insert(0, "/full/path/to/blockbuster")  # wherever you cloned it
+sys.path.insert(0, "$(pwd)")
 
 from movie_tracker.ui import main
 
@@ -60,6 +60,10 @@ if __name__ == "__main__":
 EOF
 chmod +x ~/.local/bin/blockbuster
 ```
+
+(Run this from inside the `movie-tracker` directory you just `cd`'d into — the
+unquoted heredoc bakes in `$(pwd)` as the actual clone path, so there's
+nothing to edit by hand.)
 
 (Make sure `~/.local/bin` is on your `PATH`.) Optionally, add it to your
 app launcher with a `.desktop` file (Linux):
