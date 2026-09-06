@@ -42,11 +42,20 @@ def search(title: str, page: int = 1, media_type: str | None = None) -> tuple[li
     OMDb paginates at 10 results per page; pass a higher `page` to fetch
     more of `total_results_available` results. `media_type`, if given,
     restricts to "movie" or "series"; left unset, results include both.
+
+    OMDb's fuzzy `s=` search rejects very short/common titles (e.g. "Up",
+    "It") with "Too many results" even though an exact match exists, so on
+    page 1 fall back to an exact `t=` lookup for the typed title.
     """
     params = {"s": title, "page": page}
     if media_type:
         params["type"] = media_type
-    data = _request(params)
+    try:
+        data = _request(params)
+    except OmdbError:
+        if page != 1:
+            raise
+        return _exact_match_fallback(title, media_type)
     results = []
     for item in data.get("Search", []):
         raw_type = item.get("Type", "movie")
@@ -64,6 +73,22 @@ def search(title: str, page: int = 1, media_type: str | None = None) -> tuple[li
     except ValueError:
         total = len(results)
     return results, total
+
+
+def _exact_match_fallback(title: str, media_type: str | None) -> tuple[list[dict], int]:
+    params = {"t": title}
+    if media_type:
+        params["type"] = media_type
+    data = _request(params)
+    raw_type = data.get("Type", "movie")
+    result = {
+        "title": data.get("Title", ""),
+        "year": data.get("Year", ""),
+        "imdb_id": data.get("imdbID", ""),
+        "poster_url": data.get("Poster", ""),
+        "media_type": "series" if raw_type in ("series", "episode") else "movie",
+    }
+    return [result], 1
 
 
 def get_by_id(imdb_id: str) -> dict:
