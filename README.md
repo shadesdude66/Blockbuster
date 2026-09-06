@@ -41,8 +41,11 @@ cd Blockbuster
 python3 -m blockbuster
 ```
 
-That's enough to run it. If you'd like a `blockbuster` command on your
-`PATH` instead of typing the above every time:
+That's enough to run it — but `python3 -m blockbuster` only works while
+you're inside the `Blockbuster` directory (that's how Python finds the
+package); running it from anywhere else fails with
+`No module named 'blockbuster'`. Set up the `blockbuster` command below
+if you want to launch it from anywhere without `cd`-ing back in first.
 
 ```
 mkdir -p ~/.local/bin
