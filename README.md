@@ -1,5 +1,5 @@
 # Blockbuster
-I am working on fixing the install issues!
+**I AM WORKING ON FIXING THE INSTALL ISSUES!**
 
 ![List view](screenshots/list-view.png)
 
