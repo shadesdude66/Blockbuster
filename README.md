@@ -1,5 +1,4 @@
 # Blockbuster
-**I AM WORKING ON FIXING THE INSTALL ISSUES!**
 
 ![List view](screenshots/list-view.png)
 
