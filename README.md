@@ -38,7 +38,7 @@ standard library) — no `pip install` needed. macOS and Linux both work;
 ```
 git clone https://github.com/shadesdude66/Blockbuster.git
 cd Blockbuster
-python3 -m movie_tracker
+python3 -m blockbuster
 ```
 
 That's enough to run it. If you'd like a `blockbuster` command on your
@@ -53,7 +53,7 @@ from pathlib import Path
 
 sys.path.insert(0, "$(pwd)")
 
-from movie_tracker.ui import main
+from blockbuster.ui import main
 
 if __name__ == "__main__":
     main()
@@ -190,11 +190,11 @@ it falls back to plain default-color curses styling.
 ## Project layout
 
 ```
-movie_tracker/
+blockbuster/
   config.py   config + XDG data/cache paths
   db.py       SQLite schema and queries
   omdb.py     OMDb API client (search, details, poster download)
   theme.py    reads the active Omarchy theme's colors, if present
   ui.py       curses TUI
-  __main__.py entry point (python3 -m movie_tracker)
+  __main__.py entry point (python3 -m blockbuster)
 ```
