@@ -1,5 +1,15 @@
 # Movie Tracker
 
+![List view](screenshots/list-view.png)
+
+<details>
+<summary>More screenshots (detail view, stats)</summary>
+
+![Detail view](screenshots/detail-view.png)
+![Stats view](screenshots/stats-view.png)
+
+</details>
+
 A keyboard-driven terminal app for tracking movies and TV series you've
 watched: your rating, your personal rank, runtime (or episode runtime and
 season count, plus which season you're currently on, for series), content
