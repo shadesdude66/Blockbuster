@@ -28,14 +28,62 @@ width, or for the poster outside kitty, `p` opens the poster fullscreen
 instead — falling back to `chafa` if installed, or your default image
 viewer, on terminals without kitty's image protocol.
 
+## Install
+
+Requires only Python 3.10+ (for `curses` and `sqlite3`, both in the
+standard library) — no `pip install` needed. macOS and Linux both work;
+`curses` isn't available on Windows.
+
+```
+git clone https://github.com/shadesdude66/movie-tracker.git
+cd movie-tracker
+python3 -m movie_tracker
+```
+
+That's enough to run it. If you'd like a `movie-tracker` command on your
+`PATH` instead of typing the above every time:
+
+```
+mkdir -p ~/.local/bin
+cat > ~/.local/bin/movie-tracker <<'EOF'
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+sys.path.insert(0, "/full/path/to/movie-tracker")  # wherever you cloned it
+
+from movie_tracker.ui import main
+
+if __name__ == "__main__":
+    main()
+EOF
+chmod +x ~/.local/bin/movie-tracker
+```
+
+(Make sure `~/.local/bin` is on your `PATH`.) Optionally, add it to your
+app launcher with a `.desktop` file (Linux):
+
+```
+cat > ~/.local/share/applications/movie-tracker.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Movie Tracker
+Comment=Track movies you've watched: ratings, rank, runtime, posters
+Exec=kitty --title movie-tracker -e movie-tracker
+Terminal=false
+Icon=video-x-generic
+Categories=AudioVideo;Video;Database;
+EOF
+```
+
+(Swap `kitty` for your own terminal if you don't have it — kitty just
+gets you live poster images, per the note above.)
+
 ## Run it
 
 ```
 movie-tracker
 ```
-
-(Installed at `~/.local/bin/movie-tracker`, already on your PATH. It also
-shows up as "Movie Tracker" in your app launcher.)
 
 ## Adding movies & TV series
 
