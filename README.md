@@ -36,8 +36,8 @@ standard library) — no `pip install` needed. macOS and Linux both work;
 `curses` isn't available on Windows.
 
 ```
-git clone https://github.com/shadesdude66/movie-tracker.git
-cd movie-tracker
+git clone https://github.com/shadesdude66/Blockbuster.git
+cd Blockbuster
 python3 -m movie_tracker
 ```
 
@@ -61,7 +61,7 @@ EOF
 chmod +x ~/.local/bin/blockbuster
 ```
 
-(Run this from inside the `movie-tracker` directory you just `cd`'d into — the
+(Run this from inside the `Blockbuster` directory you just `cd`'d into — the
 unquoted heredoc bakes in `$(pwd)` as the actual clone path, so there's
 nothing to edit by hand.)
 
