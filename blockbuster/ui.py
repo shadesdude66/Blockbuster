@@ -1459,46 +1459,112 @@ RANDOM_SPIN_STEPS = 16
 RANDOM_SPIN_START_DELAY = 40
 RANDOM_SPIN_SLOWDOWN = 1.22
 
+# Fraction of RANDOM_SPIN_STEPS at which each of the three reels stops
+# spinning and locks onto the final pick - left first, then middle, then
+# right, like a real slot machine.
+REEL_STOP_FRACTIONS = (0.5, 0.75, 0.95)
+REEL_FLASH_STEPS = 6
+REEL_FLASH_DELAY_MS = 140
+
+
+def _spin_attr(step: int) -> int:
+    """Cycle through the theme's accent/blue/rating colors while a reel
+    is still spinning, so the blur of titles reads as colorful motion."""
+    cycle = (accent_attr(), blue_attr(), rating_attr(9.0), rating_attr(6.0), rating_attr(2.0))
+    return cycle[step % len(cycle)] | curses.A_BOLD
+
 
 def dramatic_random_pick(stdscr, db: DB) -> int | None:
-    """Spin through the watchlist slot-machine style, slowing down before
-    landing on the actual pick, then flash the result. Returns the picked
-    movie's id (or None if the watchlist is empty)."""
+    """Spin three slot-machine reels through the watchlist, stopping them
+    one at a time on the actual pick, flash the winner, then (in kitty)
+    pop up its poster. Returns the picked movie's id (or None if the
+    watchlist is empty)."""
     watchlist = db.list(status="watchlist")
     if not watchlist:
         flash(stdscr, "Your watchlist is empty.")
         return None
     final = random.choice(watchlist)
+    final_line = f"{final['title']} ({final['year'] or '?'})"
 
     clear_kitty_images()
     curses.curs_set(0)
     h, w = stdscr.getmaxyx()
-    delay = RANDOM_SPIN_START_DELAY
-    caption = "spinning the watchlist..."
-    for _ in range(RANDOM_SPIN_STEPS):
-        candidate = random.choice(watchlist)
-        title_line = f"{candidate['title']} ({candidate['year'] or '?'})"
+
+    box_w = max(34, min(max(len(final_line), 26) + 10, w - 2))
+    box_h = min(8, max(6, h - 1))
+    box_y = max(0, h // 2 - box_h // 2)
+    box_x = max(0, (w - box_w) // 2)
+    interior_w = max(1, box_w - 4)
+
+    def center_text(y: int, text: str, attr: int) -> None:
+        text = text[:interior_w]
+        x = box_x + 2 + max(0, (interior_w - len(text)) // 2)
+        safe_addstr(stdscr, y, x, text, attr)
+
+    reel_stop_steps = [int(RANDOM_SPIN_STEPS * f) for f in REEL_STOP_FRACTIONS]
+
+    def draw_frame(box_attr: int, reel_lines: list[tuple[str, int]]) -> None:
         stdscr.clear()
-        try:
-            stdscr.addstr(h // 2 - 1, max(0, (w - len(caption)) // 2), caption[: w - 1],
-                          dim_attr() | curses.A_BOLD)
-            stdscr.addstr(h // 2 + 1, max(0, (w - len(title_line)) // 2), title_line[: w - 1],
-                          curses.A_DIM)
-        except curses.error:
-            pass
+        draw_box(stdscr, box_y, box_x, box_h, box_w, box_attr)
+        center_text(box_y + 1, "🎬 SPINNING THE WATCHLIST 🎬", box_attr)
+        for i, (text, attr) in enumerate(reel_lines):
+            center_text(box_y + 3 + i, text, attr)
         stdscr.refresh()
+
+    delay = RANDOM_SPIN_START_DELAY
+    for step in range(RANDOM_SPIN_STEPS):
+        reel_lines = []
+        for i, stop_step in enumerate(reel_stop_steps):
+            if step < stop_step:
+                candidate = random.choice(watchlist)
+                text = f"{candidate['title']} ({candidate['year'] or '?'})"
+                attr = _spin_attr(step + i)
+            else:
+                text = final_line
+                attr = rating_attr(10.0) | curses.A_BOLD | curses.A_REVERSE
+            reel_lines.append((text, attr))
+        draw_frame(accent_attr() | curses.A_BOLD, reel_lines)
         curses.napms(int(delay))
         delay *= RANDOM_SPIN_SLOWDOWN
 
-    reveal = f"*** tonight's pick: {final['title']} ({final['year'] or '?'}) ***"
+    landed = [(final_line, rating_attr(10.0) | curses.A_BOLD | curses.A_REVERSE)] * 3
+    for blink in range(REEL_FLASH_STEPS):
+        flash_attr = rating_attr(10.0) | curses.A_BOLD
+        if blink % 2 == 0:
+            flash_attr |= curses.A_REVERSE
+        draw_frame(flash_attr, landed)
+        curses.napms(REEL_FLASH_DELAY_MS)
+    curses.beep()
+
     stdscr.clear()
-    try:
-        stdscr.addstr(h // 2, max(0, (w - len(reveal)) // 2), reveal[: w - 1],
-                      rating_attr(10.0) | curses.A_BOLD)
-    except curses.error:
-        pass
+    draw_box(stdscr, box_y, box_x, box_h, box_w, rating_attr(10.0) | curses.A_BOLD)
+    center_text(box_y + 1, "🍿 tonight's pick 🍿", rating_attr(10.0) | curses.A_BOLD)
+    center_text(box_y + 3, final_line, rating_attr(10.0) | curses.A_BOLD | curses.A_REVERSE)
     stdscr.refresh()
-    curses.napms(900)
+
+    full_path = config.poster_full_path(final["poster_path"])
+    if in_kitty() and full_path and full_path.exists() and w >= PREVIEW_MIN_TERM_WIDTH:
+        preview_w = max(PREVIEW_PANEL_WIDTH_MIN, min(PREVIEW_PANEL_WIDTH_MAX, w // 3))
+        preview_left = max(0, (w - preview_w) // 2)
+        preview_top = box_y + box_h + 1
+        preview_height = min(14, h - preview_top - 1)
+        if preview_height > 3:
+            try:
+                subprocess.run(
+                    [
+                        "kitty", "+kitten", "icat",
+                        "--place", f"{preview_w}x{preview_height}@{preview_left}x{preview_top}",
+                        "--scale-up", str(full_path),
+                    ],
+                    stderr=subprocess.DEVNULL,
+                )
+            except OSError:
+                pass
+            curses.napms(1600)
+        else:
+            curses.napms(900)
+    else:
+        curses.napms(900)
     return final["id"]
 
 
