@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS movie_tags (
     tag_id   INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
     PRIMARY KEY (movie_id, tag_id)
 );
+
+CREATE TABLE IF NOT EXISTS rewatch_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    movie_id     INTEGER NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+    watched_date TEXT NOT NULL
+);
 """
 
 
@@ -209,7 +215,8 @@ class DB:
         ).fetchone()
 
     def list(self, sort: str = "rank", query: str = "", status: str | None = None,
-              tag: str | None = None, media_type: str | None = None) -> list[sqlite3.Row]:
+              tag: str | None = None, media_type: str | None = None,
+              decade: int | None = None) -> list[sqlite3.Row]:
         col, direction = SORT_FIELDS.get(sort, SORT_FIELDS["rank"])
         sql = "SELECT movies.* FROM movies"
         params: list = []
@@ -233,8 +240,24 @@ class DB:
         if media_type:
             sql += " AND movies.media_type = ?"
             params.append(media_type)
+        if decade is not None:
+            sql += (
+                " AND movies.year GLOB '[0-9][0-9][0-9][0-9]*'"
+                " AND (CAST(substr(movies.year, 1, 4) AS INTEGER) / 10) * 10 = ?"
+            )
+            params.append(decade)
         sql += f" ORDER BY {col} {direction}"
         return self.conn.execute(sql, params).fetchall()
+
+    def all_decades(self) -> list[int]:
+        """Distinct decades present among non-deleted movies with a year,
+        newest first - the options cycled by the list screen's decade filter."""
+        rows = self.conn.execute(
+            "SELECT DISTINCT (CAST(substr(year, 1, 4) AS INTEGER) / 10) * 10 AS decade "
+            "FROM movies WHERE deleted_at IS NULL AND year GLOB '[0-9][0-9][0-9][0-9]*' "
+            "ORDER BY decade DESC"
+        ).fetchall()
+        return [row["decade"] for row in rows if row["decade"] is not None]
 
     def list_deleted(self) -> list[sqlite3.Row]:
         return self.conn.execute(
@@ -296,3 +319,28 @@ class DB:
                     (movie_id, tag_id),
                 )
         self.conn.commit()
+
+    # --------------------------------------------------------- rewatches --
+
+    def log_rewatch(self, movie_id: int, watched_date: str | None = None) -> None:
+        """Record a rewatch with today's date (or `watched_date`), and keep
+        the movies.rewatch_count column in sync for the stats screen."""
+        watched_date = watched_date or date.today().isoformat()
+        self.conn.execute(
+            "INSERT INTO rewatch_log (movie_id, watched_date) VALUES (?, ?)",
+            (movie_id, watched_date),
+        )
+        self.conn.execute(
+            "UPDATE movies SET rewatch_count = rewatch_count + 1 WHERE id = ?",
+            (movie_id,),
+        )
+        self.conn.commit()
+
+    def get_rewatch_history(self, movie_id: int) -> list[str]:
+        """Rewatch dates for a movie, most recent first."""
+        rows = self.conn.execute(
+            "SELECT watched_date FROM rewatch_log WHERE movie_id = ? "
+            "ORDER BY watched_date DESC, id DESC",
+            (movie_id,),
+        )
+        return [row["watched_date"] for row in rows]

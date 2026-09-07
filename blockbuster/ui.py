@@ -1,5 +1,6 @@
 """Curses TUI for Blockbuster."""
 
+import argparse
 import csv
 import curses
 import json
@@ -13,8 +14,9 @@ from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
 
-from . import config, omdb, theme
+from . import __version__, config, omdb, theme, watchmode
 from .db import DB, Movie, SORT_FIELDS
+from .recommend import recommend_watchlist
 
 # Help screen content, grouped by section for the column layout in
 # show_help_screen() - keep each description to one short line, it has
@@ -29,6 +31,7 @@ HELP_SECTIONS = [
         ("Tab", "cycle status filter"),
         ("y", "cycle type filter"),
         ("g", "cycle tag filter"),
+        ("D", "cycle decade filter"),
         ("Space", "mark/unmark selected"),
         ("Esc", "clear all marks"),
         ("G", "tag marked movie(s)"),
@@ -41,6 +44,7 @@ HELP_SECTIONS = [
         ("w", "mark watched"),
         ("W", "mark watchlist"),
         ("R", "random watchlist pick"),
+        ("F", "recommended for you"),
         ("P", "poster wall (kitty only)"),
         ("T", "trash: browse/restore/purge"),
         ("S", "stats screen"),
@@ -56,6 +60,8 @@ HELP_SECTIONS = [
         ("w", "toggle watched/watchlist"),
         ("t", "set watched date to today"),
         ("c", "+1 rewatch count"),
+        ("v", "view rewatch history"),
+        ("o", "where to watch (needs Watchmode key)"),
         ("N", "advance season (series)"),
         ("e", "edit notes"),
         ("E", "edit all fields at once"),
@@ -63,7 +69,7 @@ HELP_SECTIONS = [
         ("x", "delete this movie"),
     ]),
     ("OTHER", [
-        ("K", "set/update OMDb API key"),
+        ("K", "set/update API keys (OMDb, Watchmode)"),
         ("?", "this help screen"),
         ("q / Esc", "back / quit"),
     ]),
@@ -1018,7 +1024,7 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                         stdscr.addstr(y, 2, wline[: content_w - 3])
                         y += 1
 
-            footer = "r rating  n rank  M rated  w watched  t today  c +rewatch  "
+            footer = "r rating  n rank  M rated  w watched  t today  c +rewatch  v history  o watch  "
             if is_series:
                 footer += "N +season  "
             footer += "e notes  E edit all  p poster  x delete  q back"
@@ -1084,7 +1090,32 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
             elif ch == ord("t"):
                 db.update(movie_id, watched_date=date.today().isoformat(), status="watched")
             elif ch == ord("c"):
-                db.update(movie_id, rewatch_count=row["rewatch_count"] + 1)
+                db.log_rewatch(movie_id)
+            elif ch == ord("v"):
+                history = db.get_rewatch_history(movie_id)
+                if not history:
+                    flash(stdscr, "No rewatches logged yet - press 'c' to log one.")
+                else:
+                    lines = [f"REWATCH HISTORY: {row['title']}", ""]
+                    lines.extend(history)
+                    lines.append("")
+                    lines.append("Press any key to close.")
+                    show_text_screen(stdscr, "\n".join(lines))
+            elif ch == ord("o"):
+                try:
+                    sources = watchmode.get_streaming_sources(row["imdb_id"])
+                except watchmode.WatchmodeError as e:
+                    flash(stdscr, str(e))
+                else:
+                    if not sources:
+                        flash(stdscr, "No streaming sources found for this title.")
+                    else:
+                        lines = [f"WHERE TO WATCH: {row['title']}", ""]
+                        for label, names in watchmode.group_sources_by_type(sources):
+                            lines.append(f"{label}: {', '.join(names)}")
+                        lines.append("")
+                        lines.append("Press any key to close.")
+                        show_text_screen(stdscr, "\n".join(lines))
             elif ch == ord("N") and is_series:
                 season = (row["current_season"] or 0) + 1
                 if row["total_seasons"] and season > row["total_seasons"]:
@@ -1411,6 +1442,33 @@ def poster_wall_screen(stdscr, db: DB) -> None:
         clear_kitty_images()
 
 
+# --------------------------------------------------------- recommended --
+
+
+def recommendations_screen(stdscr, db: DB) -> None:
+    """Watchlist titles most similar (by genre/director/cast overlap) to
+    your highly-rated watched movies. Enter opens a pick's details."""
+    scored = recommend_watchlist(db)
+    if not scored:
+        flash(
+            stdscr,
+            "No recommendations yet - rate some watched movies (press 'r') "
+            "to build a taste profile.",
+        )
+        return
+
+    def formatter(item):
+        m, score, reasons = item
+        why = "; ".join(reasons)
+        return f"{m['title']} ({m['year'] or '?'})  [{score:.1f}]  {why}"
+
+    picked = choose_from_list(
+        stdscr, "RECOMMENDED FOR YOU (from your watchlist)", scored, formatter
+    )
+    if picked:
+        movie_detail(stdscr, db, picked[0]["id"])
+
+
 # ------------------------------------------------------- dramatic random --
 
 RANDOM_SPIN_STEPS = 16
@@ -1709,6 +1767,7 @@ class App:
         self.status_idx = 0
         self.type_idx = 0
         self.tag_filter: str | None = None
+        self.decade_filter: int | None = None
         self.idx = 0
         self.top = 0
         self.last_preview_key = "unset"
@@ -1726,6 +1785,7 @@ class App:
         return self.db.list(
             sort=self.sort, query=self.query, status=self.status_filter,
             tag=self.tag_filter, media_type=self.type_filter,
+            decade=self.decade_filter,
         )
 
     def cycle_tag_filter(self) -> None:
@@ -1736,6 +1796,16 @@ class App:
         except ValueError:
             i = 0
         self.tag_filter = options[(i + 1) % len(options)]
+        self.idx = 0
+
+    def cycle_decade_filter(self) -> None:
+        decades = self.db.all_decades()
+        options = [None] + decades
+        try:
+            i = options.index(self.decade_filter)
+        except ValueError:
+            i = 0
+        self.decade_filter = options[(i + 1) % len(options)]
         self.idx = 0
 
     def bulk_targets(self, movies) -> list[int]:
@@ -1791,6 +1861,8 @@ class App:
             sub += f"  type:{self.type_filter}"
         if self.tag_filter:
             sub += f"  tag:'{self.tag_filter}'"
+        if self.decade_filter is not None:
+            sub += f"  decade:{self.decade_filter}s"
         if self.query:
             sub += f"  filter:'{self.query}'"
         if self.selected_ids:
@@ -2120,6 +2192,12 @@ class App:
                 self.idx = 0
             elif ch == ord("g"):
                 self.cycle_tag_filter()
+            elif ch == ord("D"):
+                self.cycle_decade_filter()
+            elif ch == ord("F"):
+                clear_kitty_images()
+                self.last_preview_key = "unset"
+                recommendations_screen(stdscr, self.db)
             elif ch == ord(" "):
                 if movies:
                     mid = movies[self.idx]["id"]
@@ -2161,10 +2239,20 @@ class App:
                 self.status_idx = (self.status_idx + 1) % len(STATUS_CYCLE)
                 self.idx = 0
             elif ch == ord("K"):
+                changed = False
                 key = prompt(stdscr, "OMDb API key", config.get_api_key() or "")
                 if key:
                     config.set_api_key(key.strip())
-                    flash(stdscr, "API key saved.")
+                    changed = True
+                wkey = prompt(
+                    stdscr, "Watchmode API key (optional, for 'o' in detail view)",
+                    config.get_watchmode_key() or "",
+                )
+                if wkey:
+                    config.set_watchmode_key(wkey.strip())
+                    changed = True
+                if changed:
+                    flash(stdscr, "API key(s) saved.")
             elif ch == ord("?"):
                 clear_kitty_images()
                 self.last_preview_key = "unset"
@@ -2176,6 +2264,13 @@ def _run(stdscr, db: DB):
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="blockbuster",
+        description="A keyboard-driven terminal app for tracking movies and TV series you've watched.",
+    )
+    parser.add_argument("--version", action="version", version=f"blockbuster {__version__}")
+    parser.parse_args()
+
     # Needed for ncurses to render non-ASCII text (the movie/series icons,
     # the watched checkmark) correctly instead of mangling or dropping it -
     # must be set before initscr() runs.

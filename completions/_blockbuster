@@ -1,0 +1,10 @@
+#compdef blockbuster
+# Zsh completion for the `blockbuster` command.
+# Put this file (named `_blockbuster`) somewhere on your $fpath, e.g.:
+#   mkdir -p ~/.zsh/completions
+#   cp completions/_blockbuster ~/.zsh/completions/
+#   fpath=(~/.zsh/completions $fpath)   # add to ~/.zshrc before compinit
+
+_arguments \
+  '--help[show help message and exit]' \
+  '--version[show version and exit]'

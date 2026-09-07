@@ -83,6 +83,20 @@ EOF
 (Swap `kitty` for your own terminal if you don't have it — kitty just
 gets you live poster images, per the note above.)
 
+### Shell completion
+
+Tab-completion for `blockbuster`'s `--help`/`--version` flags:
+
+```
+# bash - add to ~/.bashrc
+source /path/to/Blockbuster/completions/blockbuster.bash
+
+# zsh - put completions/_blockbuster on your $fpath (before compinit), e.g.
+mkdir -p ~/.zsh/completions
+cp completions/_blockbuster ~/.zsh/completions/
+# then in ~/.zshrc, before compinit: fpath=(~/.zsh/completions $fpath)
+```
+
 ## Run it
 
 ```
@@ -105,13 +119,19 @@ Online search needs a free OMDb API key: get one at
 https://www.omdbapi.com/apikey.aspx (activate via email), then press
 `K` in the app to save it. It's stored in
 `~/.config/blockbuster/config.json`, or set the `OMDB_API_KEY`
-environment variable instead.
+environment variable instead. Press `K` again any time to update it or
+add a second key for "where to watch" lookups (see below).
 
 ## Everyday keys
 
 `Space` marks movies for bulk actions; `G`, `d`, `w`, and `W` below
 apply to every marked movie, or just the selected one if none are
 marked.
+
+Status (`Tab`), type (`y`), tag (`g`), decade (`D`), and the free-text
+filter (`/`, which matches title/genre/director/actors) all combine —
+e.g. `Tab` to watchlist, `g` to a tag, and `D` to a decade narrows to
+just that combination.
 
 | Key | Action |
 |---|---|
@@ -123,6 +143,7 @@ marked.
 | `Tab` | cycle status filter (all / watchlist / watched) |
 | `y` | cycle type filter (all / movie / series) |
 | `g` | cycle tag filter (none, then each tag you've used) |
+| `D` | cycle decade filter (none, then each decade you have titles from) |
 | `Space` | mark/unmark selection |
 | `Esc` | clear all marks |
 | `G` | add tag(s) |
@@ -131,6 +152,7 @@ marked.
 | `w` | mark as watched |
 | `W` | mark as watchlist |
 | `R` | random pick from your watchlist, with a slot-machine spin |
+| `F` | recommended for you: watchlist titles most similar (by genre/director/cast) to your highly-rated watched movies; `Enter` opens a pick |
 | `P` | poster wall: browsable kitty-image grid of cached posters; arrows move, `Enter` opens details |
 | `T` | trash screen: browse, restore, or permanently delete |
 | `S` | stats screen: totals, watch time, averages, top genres, decades |
@@ -155,18 +177,26 @@ Inside a movie's detail screen:
 | `M` | set/edit content rating (R, PG-13, TV-14, etc.) |
 | `w` | toggle watched / watchlist |
 | `t` | mark watched today |
-| `c` | +1 rewatch count |
+| `c` | +1 rewatch count (also logs today's date) |
+| `v` | view rewatch history (every logged date) |
+| `o` | where to watch: streaming/rent/buy sources (needs a free Watchmode API key) |
 | `N` | (series only) advance to the next season |
 | `e` | edit notes |
 | `E` | edit every field, grouped into sections (Title / Status & Ratings / Details / Text); changed fields marked `*`; `q` saves, `Esc` discards (confirms if changed) |
 | `p` | view the poster fullscreen |
 | `x` | delete this movie |
 
+"Where to watch" (`o`) needs its own free API key from
+https://api.watchmode.com/ (1,000 requests/month) — press `K` in the
+list screen and enter it at the second prompt, or set the
+`WATCHMODE_API_KEY` environment variable. Only works for titles added
+via OMDb search (`a`), since it looks the title up by IMDb id.
+
 ## Data
 
 - SQLite database: `~/.local/share/blockbuster/movies.db`
 - Cached posters: `~/.local/share/blockbuster/posters/`
-- Config (API key): `~/.config/blockbuster/config.json`
+- Config (API keys): `~/.config/blockbuster/config.json`
 - Manual backups (`B`): `~/.local/share/blockbuster/backups/`
 - Exports (`X`): `~/.local/share/blockbuster/exports/`
 
@@ -187,10 +217,13 @@ it falls back to plain default-color curses styling.
 
 ```
 blockbuster/
-  config.py   config + XDG data/cache paths
-  db.py       SQLite schema and queries
-  omdb.py     OMDb API client (search, details, poster download)
-  theme.py    reads the active Omarchy theme's colors, if present
-  ui.py       curses TUI
-  __main__.py entry point (python3 -m blockbuster)
+  config.py     config + XDG data/cache paths
+  db.py         SQLite schema and queries
+  omdb.py       OMDb API client (search, details, poster download)
+  watchmode.py  Watchmode API client (streaming/rent/buy availability)
+  recommend.py  local genre/director/cast similarity scoring
+  theme.py      reads the active Omarchy theme's colors, if present
+  ui.py         curses TUI
+  __main__.py   entry point (python3 -m blockbuster)
+completions/    bash/zsh completion scripts for the blockbuster command
 ```
