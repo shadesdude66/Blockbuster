@@ -75,16 +75,3 @@ def set_api_key(key: str) -> None:
     cfg = load_config()
     cfg["omdb_api_key"] = key
     save_config(cfg)
-
-
-def get_watchmode_key() -> str | None:
-    env_key = os.environ.get("WATCHMODE_API_KEY")
-    if env_key:
-        return env_key
-    return load_config().get("watchmode_api_key")
-
-
-def set_watchmode_key(key: str) -> None:
-    cfg = load_config()
-    cfg["watchmode_api_key"] = key
-    save_config(cfg)

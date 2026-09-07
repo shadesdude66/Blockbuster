@@ -119,8 +119,7 @@ Online search needs a free OMDb API key: get one at
 https://www.omdbapi.com/apikey.aspx (activate via email), then press
 `K` in the app to save it. It's stored in
 `~/.config/blockbuster/config.json`, or set the `OMDB_API_KEY`
-environment variable instead. Press `K` again any time to update it or
-add a second key for "where to watch" lookups (see below).
+environment variable instead. Press `K` again any time to update it.
 
 ## Everyday keys
 
@@ -179,24 +178,17 @@ Inside a movie's detail screen:
 | `t` | mark watched today |
 | `c` | +1 rewatch count (also logs today's date) |
 | `v` | view rewatch history (every logged date) |
-| `o` | where to watch: streaming/rent/buy sources (needs a free Watchmode API key) |
 | `N` | (series only) advance to the next season |
 | `e` | edit notes |
 | `E` | edit every field, grouped into sections (Title / Status & Ratings / Details / Text); changed fields marked `*`; `q` saves, `Esc` discards (confirms if changed) |
 | `p` | view the poster fullscreen |
 | `x` | delete this movie |
 
-"Where to watch" (`o`) needs its own free API key from
-https://api.watchmode.com/ (1,000 requests/month) — press `K` in the
-list screen and enter it at the second prompt, or set the
-`WATCHMODE_API_KEY` environment variable. Only works for titles added
-via OMDb search (`a`), since it looks the title up by IMDb id.
-
 ## Data
 
 - SQLite database: `~/.local/share/blockbuster/movies.db`
 - Cached posters: `~/.local/share/blockbuster/posters/`
-- Config (API keys): `~/.config/blockbuster/config.json`
+- Config (API key): `~/.config/blockbuster/config.json`
 - Manual backups (`B`): `~/.local/share/blockbuster/backups/`
 - Exports (`X`): `~/.local/share/blockbuster/exports/`
 
@@ -220,7 +212,6 @@ blockbuster/
   config.py     config + XDG data/cache paths
   db.py         SQLite schema and queries
   omdb.py       OMDb API client (search, details, poster download)
-  watchmode.py  Watchmode API client (streaming/rent/buy availability)
   recommend.py  local genre/director/cast similarity scoring
   theme.py      reads the active Omarchy theme's colors, if present
   ui.py         curses TUI

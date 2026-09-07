@@ -14,7 +14,7 @@ from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
 
-from . import __version__, config, omdb, theme, watchmode
+from . import __version__, config, omdb, theme
 from .db import DB, Movie, SORT_FIELDS
 from .recommend import recommend_watchlist
 
@@ -61,7 +61,6 @@ HELP_SECTIONS = [
         ("t", "set watched date to today"),
         ("c", "+1 rewatch count"),
         ("v", "view rewatch history"),
-        ("o", "where to watch (needs Watchmode key)"),
         ("N", "advance season (series)"),
         ("e", "edit notes"),
         ("E", "edit all fields at once"),
@@ -69,7 +68,7 @@ HELP_SECTIONS = [
         ("x", "delete this movie"),
     ]),
     ("OTHER", [
-        ("K", "set/update API keys (OMDb, Watchmode)"),
+        ("K", "set/update OMDb API key"),
         ("?", "this help screen"),
         ("q / Esc", "back / quit"),
     ]),
@@ -1024,7 +1023,7 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                         stdscr.addstr(y, 2, wline[: content_w - 3])
                         y += 1
 
-            footer = "r rating  n rank  M rated  w watched  t today  c +rewatch  v history  o watch  "
+            footer = "r rating  n rank  M rated  w watched  t today  c +rewatch  v history  "
             if is_series:
                 footer += "N +season  "
             footer += "e notes  E edit all  p poster  x delete  q back"
@@ -1101,21 +1100,6 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                     lines.append("")
                     lines.append("Press any key to close.")
                     show_text_screen(stdscr, "\n".join(lines))
-            elif ch == ord("o"):
-                try:
-                    sources = watchmode.get_streaming_sources(row["imdb_id"])
-                except watchmode.WatchmodeError as e:
-                    flash(stdscr, str(e))
-                else:
-                    if not sources:
-                        flash(stdscr, "No streaming sources found for this title.")
-                    else:
-                        lines = [f"WHERE TO WATCH: {row['title']}", ""]
-                        for label, names in watchmode.group_sources_by_type(sources):
-                            lines.append(f"{label}: {', '.join(names)}")
-                        lines.append("")
-                        lines.append("Press any key to close.")
-                        show_text_screen(stdscr, "\n".join(lines))
             elif ch == ord("N") and is_series:
                 season = (row["current_season"] or 0) + 1
                 if row["total_seasons"] and season > row["total_seasons"]:
@@ -2239,20 +2223,10 @@ class App:
                 self.status_idx = (self.status_idx + 1) % len(STATUS_CYCLE)
                 self.idx = 0
             elif ch == ord("K"):
-                changed = False
                 key = prompt(stdscr, "OMDb API key", config.get_api_key() or "")
                 if key:
                     config.set_api_key(key.strip())
-                    changed = True
-                wkey = prompt(
-                    stdscr, "Watchmode API key (optional, for 'o' in detail view)",
-                    config.get_watchmode_key() or "",
-                )
-                if wkey:
-                    config.set_watchmode_key(wkey.strip())
-                    changed = True
-                if changed:
-                    flash(stdscr, "API key(s) saved.")
+                    flash(stdscr, "API key saved.")
             elif ch == ord("?"):
                 clear_kitty_images()
                 self.last_preview_key = "unset"
