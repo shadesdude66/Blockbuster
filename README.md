@@ -219,6 +219,10 @@ date, runtime — with six pre-built views (All, Watched, Watchlist, Top
 Rated, TV Shows, Movies Only). Click any column header in Obsidian to
 re-sort.
 
+## CSV Export
+
+You can also export to a CSV through the menu inside the app.
+
 ## Theming
 
 On an Omarchy desktop, the app reads the active theme's accent/selection
