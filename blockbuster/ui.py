@@ -2309,7 +2309,27 @@ def main() -> None:
         description="A keyboard-driven terminal app for tracking movies and TV series you've watched.",
     )
     parser.add_argument("--version", action="version", version=f"blockbuster {__version__}")
-    parser.parse_args()
+    parser.add_argument(
+        "--export-obsidian",
+        metavar="DIR",
+        help="export the library as an Obsidian vault (markdown notes) to DIR and exit",
+    )
+    args = parser.parse_args()
+
+    if args.export_obsidian:
+        from . import obsidian_export
+
+        config.ensure_dirs()
+        db = DB()
+        try:
+            counts = obsidian_export.export_vault(db, args.export_obsidian)
+        finally:
+            db.close()
+        print(
+            f"Exported {counts['movies']} titles, {counts['people']} people, "
+            f"and {counts['genres']} genres to {args.export_obsidian}"
+        )
+        return
 
     # Needed for ncurses to render non-ASCII text (the movie/series icons,
     # the watched checkmark) correctly instead of mangling or dropping it -

@@ -197,6 +197,28 @@ press `B` in the app for a timestamped copy. Deleting a movie (`d`/`x`)
 just hides it — restore with `u` (or from the `T` trash screen), or
 purge it permanently from trash by typing the exact title to confirm.
 
+### Obsidian vault export
+
+```
+blockbuster --export-obsidian ~/notes/BlockbusterVault
+```
+
+Writes a snapshot of your library as an Obsidian-ready markdown vault:
+one note per movie/series (YAML frontmatter with rating, genre, cast,
+tags, watched date, etc., plus its poster), one stub note per
+director/actor and per genre with backlinks to their titles, and a
+`Blockbuster.md` index grouped by status — enough for Obsidian's graph
+and backlinks to connect everything. It's a one-shot export, not a
+live sync; re-run the command to refresh the vault.
+
+It also writes `Movies.base`, an Obsidian Base (requires Obsidian
+1.9+, where Bases ships as a core plugin) that shows the whole library
+as a sortable, filterable spreadsheet over the frontmatter fields —
+title, status, my rating, IMDb rating, rank, genre, cast, watched
+date, runtime — with six pre-built views (All, Watched, Watchlist, Top
+Rated, TV Shows, Movies Only). Click any column header in Obsidian to
+re-sort.
+
 ## Theming
 
 On an Omarchy desktop, the app reads the active theme's accent/selection
