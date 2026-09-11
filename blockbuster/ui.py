@@ -2327,7 +2327,8 @@ def main() -> None:
             db.close()
         print(
             f"Exported {counts['movies']} titles, {counts['people']} people, "
-            f"and {counts['genres']} genres to {args.export_obsidian}"
+            f"{counts['genres']} genres, and {counts['collections']} collections "
+            f"to {args.export_obsidian}"
         )
         return
 

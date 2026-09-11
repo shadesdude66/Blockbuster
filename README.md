@@ -206,18 +206,20 @@ blockbuster --export-obsidian ~/notes/BlockbusterVault
 Writes a snapshot of your library as an Obsidian-ready markdown vault:
 one note per movie/series (YAML frontmatter with rating, genre, cast,
 tags, watched date, etc., plus its poster), one stub note per
-director/actor and per genre with backlinks to their titles, and a
+director/actor, genre, and collection/tag with backlinks to their
+titles, a `Stats.md` mirroring the app's `S` stats screen (totals,
+watch time, average ratings, top genres, by decade), and a
 `Blockbuster.md` index grouped by status — enough for Obsidian's graph
 and backlinks to connect everything. It's a one-shot export, not a
 live sync; re-run the command to refresh the vault.
 
 It also writes `Movies.base`, an Obsidian Base (requires Obsidian
-1.9+, where Bases ships as a core plugin) that shows the whole library
-as a sortable, filterable spreadsheet over the frontmatter fields —
-title, status, my rating, IMDb rating, rank, genre, cast, watched
-date, runtime — with six pre-built views (All, Watched, Watchlist, Top
-Rated, TV Shows, Movies Only). Click any column header in Obsidian to
-re-sort.
+1.9+, where Bases ships as a core plugin) with seven pre-built views:
+six sortable/filterable table views (All, Watched, Watchlist, Top
+Rated, TV Shows, Movies Only) over fields like status, my rating, IMDb
+rating, rank, genre, cast, and watched date — click any column header
+in Obsidian to re-sort — plus a Poster Wall cards view for browsing
+the library as a visual gallery.
 
 ## CSV Export
 
