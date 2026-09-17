@@ -65,6 +65,7 @@ HELP_SECTIONS = [
         ("e", "edit notes"),
         ("E", "edit all fields at once"),
         ("p", "view poster fullscreen"),
+        ("u", "refresh poster from OMDb"),
         ("x", "delete this movie"),
     ]),
     ("OTHER", [
@@ -1026,7 +1027,7 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
             footer = "r rating  n rank  M rated  w watched  t today  c +rewatch  v history  "
             if is_series:
                 footer += "N +season  "
-            footer += "e notes  E edit all  p poster  x delete  q back"
+            footer += "e notes  E edit all  p poster  u refresh poster  x delete  q back"
             stdscr.addstr(h - 1, 0, footer[: w - 1], dim_attr())
             stdscr.refresh()
 
@@ -1114,6 +1115,24 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                 clear_kitty_images()
                 last_poster_key = "unset"
                 view_poster(stdscr, row["poster_path"], title_line)
+            elif ch == ord("u"):
+                if not row["imdb_id"]:
+                    flash(stdscr, "No IMDb ID on this title - can't auto-fetch a poster.")
+                else:
+                    flash(stdscr, "Fetching latest poster from OMDb...")
+                    try:
+                        details = omdb.get_by_id(row["imdb_id"])
+                    except omdb.OmdbError as e:
+                        flash(stdscr, f"OMDb error: {e}")
+                    else:
+                        new_path = omdb.download_poster(details.get("poster_url", ""), row["imdb_id"])
+                        if new_path:
+                            db.update(movie_id, poster_path=new_path)
+                            clear_kitty_images()
+                            last_poster_key = "unset"
+                            flash(stdscr, "Poster updated from OMDb.")
+                        else:
+                            flash(stdscr, "OMDb has no poster for this title.")
             elif ch == ord("x"):
                 if confirm(stdscr, f"Delete '{row['title']}'?"):
                     db.delete(movie_id)
