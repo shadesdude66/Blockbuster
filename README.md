@@ -182,6 +182,7 @@ Inside a movie's detail screen:
 | `e` | edit notes |
 | `E` | edit every field, grouped into sections (Title / Status & Ratings / Details / Text); changed fields marked `*`; `q` saves, `Esc` discards (confirms if changed) |
 | `p` | view the poster fullscreen |
+| `u` | re-fetch the poster from OMDb (needs an IMDb id, so not for manually-added titles) |
 | `x` | delete this movie |
 
 ## Data
