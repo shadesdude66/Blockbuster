@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from . import config
 
@@ -218,7 +218,8 @@ class DB:
 
     def list(self, sort: str = "rank", query: str = "", status: str | None = None,
               tag: str | None = None, media_type: str | None = None,
-              decade: int | None = None) -> list[sqlite3.Row]:
+              decade: int | None = None, rating_min: float | None = None,
+              runtime_max: int | None = None) -> list[sqlite3.Row]:
         col, direction = SORT_FIELDS.get(sort, SORT_FIELDS["rank"])
         sql = "SELECT movies.* FROM movies"
         params: list = []
@@ -248,6 +249,12 @@ class DB:
                 " AND (CAST(substr(movies.year, 1, 4) AS INTEGER) / 10) * 10 = ?"
             )
             params.append(decade)
+        if rating_min is not None:
+            sql += " AND COALESCE(movies.my_rating, movies.imdb_rating) >= ?"
+            params.append(rating_min)
+        if runtime_max is not None:
+            sql += " AND movies.runtime_minutes IS NOT NULL AND movies.runtime_minutes <= ?"
+            params.append(runtime_max)
         sql += f" ORDER BY {col} {direction}"
         return self.conn.execute(sql, params).fetchall()
 
@@ -260,6 +267,37 @@ class DB:
             "ORDER BY decade DESC"
         ).fetchall()
         return [row["decade"] for row in rows if row["decade"] is not None]
+
+    def aging_watchlist(self, min_days: int = 90) -> list[sqlite3.Row]:
+        """Watchlist titles added at least `min_days` ago, oldest first -
+        the backlog a 'dig this out' nudge should surface."""
+        cutoff = (date.today() - timedelta(days=min_days)).isoformat()
+        return self.conn.execute(
+            "SELECT * FROM movies WHERE deleted_at IS NULL AND status = 'watchlist' "
+            "AND added_at <= ? ORDER BY added_at ASC",
+            (cutoff,),
+        ).fetchall()
+
+    def watch_activity_by_date(self, since: str | None = None):
+        """Count of watch events (first watches + logged rewatches) per
+        date, for the activity heatmap. `since` (YYYY-MM-DD) limits the
+        range; omit it for all-time counts."""
+        counts: dict[str, int] = {}
+        q = "SELECT watched_date FROM movies WHERE watched_date IS NOT NULL AND deleted_at IS NULL"
+        params: list = []
+        if since:
+            q += " AND watched_date >= ?"
+            params.append(since)
+        for row in self.conn.execute(q, params):
+            counts[row["watched_date"]] = counts.get(row["watched_date"], 0) + 1
+        q2 = "SELECT watched_date FROM rewatch_log"
+        params2: list = []
+        if since:
+            q2 += " WHERE watched_date >= ?"
+            params2.append(since)
+        for row in self.conn.execute(q2, params2):
+            counts[row["watched_date"]] = counts.get(row["watched_date"], 0) + 1
+        return counts
 
     def list_deleted(self) -> list[sqlite3.Row]:
         return self.conn.execute(

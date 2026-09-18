@@ -119,7 +119,8 @@ Online search needs a free OMDb API key: get one at
 https://www.omdbapi.com/apikey.aspx (activate via email), then press
 `K` in the app to save it. It's stored in
 `~/.config/blockbuster/config.json`, or set the `OMDB_API_KEY`
-environment variable instead. Press `K` again any time to update it.
+environment variable instead. Press `K` again any time to update it or
+add a second key for "where to watch" lookups (see below).
 
 ## Everyday keys
 
@@ -143,6 +144,8 @@ just that combination.
 | `y` | cycle type filter (all / movie / series) |
 | `g` | cycle tag filter (none, then each tag you've used) |
 | `D` | cycle decade filter (none, then each decade you have titles from) |
+| `r` | set/clear a minimum rating filter (your rating, or IMDb's if unwatched) |
+| `t` | set/clear a maximum runtime filter, in minutes |
 | `Space` | mark/unmark selection |
 | `Esc` | clear all marks |
 | `G` | add tag(s) |
@@ -152,13 +155,15 @@ just that combination.
 | `W` | mark as watchlist |
 | `R` | random pick from your watchlist, with a slot-machine spin |
 | `F` | recommended for you: watchlist titles most similar (by genre/director/cast) to your highly-rated watched movies; `Enter` opens a pick |
+| `A` | aging watchlist: titles sitting unwatched 90+ days, oldest first; `Enter` opens a pick |
+| `H` | watch activity heatmap: a GitHub-style grid of watch/rewatch dates over the last ~6 months |
 | `P` | poster wall: browsable kitty-image grid of cached posters; arrows move, `Enter` opens details |
 | `T` | trash screen: browse, restore, or permanently delete |
 | `S` | stats screen: totals, watch time, averages, top genres, decades |
 | `C` | collections: your tags as franchises, with watched/total count, average rating, and a ★ once complete; `Enter` drills into a tag's titles by year |
 | `B` | back up the database now (timestamped copy) |
 | `X` | export the collection to CSV or JSON |
-| `I` | import from a CSV/JSON file (same format as `X`'s export); skips anything already present, matched by IMDb id or title+year |
+| `I` | import from a CSV/JSON file (same format as `X`'s export, or a raw Letterboxd export - see below); skips anything already present, matched by IMDb id or title+year |
 | `?` | full help screen |
 | `q` | back / quit |
 
@@ -178,6 +183,7 @@ Inside a movie's detail screen:
 | `t` | mark watched today |
 | `c` | +1 rewatch count (also logs today's date) |
 | `v` | view rewatch history (every logged date) |
+| `o` | where to watch: streaming/rent/buy sources, plus a trailer link (needs a free TMDb API key) |
 | `N` | (series only) advance to the next season |
 | `e` | edit notes |
 | `E` | edit every field, grouped into sections (Title / Status & Ratings / Details / Text); changed fields marked `*`; `q` saves, `Esc` discards (confirms if changed) |
@@ -185,11 +191,17 @@ Inside a movie's detail screen:
 | `u` | re-fetch the poster from OMDb (needs an IMDb id, so not for manually-added titles) |
 | `x` | delete this movie |
 
+"Where to watch" (`o`) needs its own free API key from
+https://www.themoviedb.org/settings/api — press `K` in the list screen
+and enter it at the second prompt, or set the `TMDB_API_KEY`
+environment variable. Only works for titles added via OMDb search
+(`a`), since it looks the title up by IMDb id.
+
 ## Data
 
 - SQLite database: `~/.local/share/blockbuster/movies.db`
 - Cached posters: `~/.local/share/blockbuster/posters/`
-- Config (API key): `~/.config/blockbuster/config.json`
+- Config (API keys): `~/.config/blockbuster/config.json`
 - Manual backups (`B`): `~/.local/share/blockbuster/backups/`
 - Exports (`X`): `~/.local/share/blockbuster/exports/`
 
@@ -197,6 +209,19 @@ Back up or sync `movies.db` to keep your data safe across machines, or
 press `B` in the app for a timestamped copy. Deleting a movie (`d`/`x`)
 just hides it — restore with `u` (or from the `T` trash screen), or
 purge it permanently from trash by typing the exact title to confirm.
+
+### Importing from Letterboxd
+
+Press `I` and point it at a CSV from a Letterboxd data export
+(https://letterboxd.com/settings/data/, or Settings → Import & Export
+→ Export Your Data) — `watched.csv`, `ratings.csv`, `diary.csv`, and
+`watchlist.csv` are all recognized automatically by their Letterboxd
+column headers, no need to reformat them first. Star ratings (0.5–5)
+are scaled to this app's 0–10 scale; a `diary.csv` row marked as a
+rewatch logs a rewatch on the existing title (viewable with `v`)
+instead of being skipped as a duplicate. Letterboxd doesn't export
+genre, director, cast, or posters — re-fetch those later by deleting
+and re-adding a title via OMDb search (`a`) if you want them filled in.
 
 ### Obsidian vault export
 
@@ -241,6 +266,7 @@ blockbuster/
   config.py     config + XDG data/cache paths
   db.py         SQLite schema and queries
   omdb.py       OMDb API client (search, details, poster download)
+  tmdb.py       TMDb API client (watch providers, trailers)
   recommend.py  local genre/director/cast similarity scoring
   theme.py      reads the active Omarchy theme's colors, if present
   ui.py         curses TUI

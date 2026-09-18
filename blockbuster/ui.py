@@ -11,10 +11,10 @@ import shutil
 import subprocess
 import textwrap
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from . import __version__, config, omdb, theme
+from . import __version__, config, omdb, theme, tmdb
 from .db import DB, Movie, SORT_FIELDS
 from .recommend import recommend_watchlist
 
@@ -32,6 +32,8 @@ HELP_SECTIONS = [
         ("y", "cycle type filter"),
         ("g", "cycle tag filter"),
         ("D", "cycle decade filter"),
+        ("r", "set minimum rating filter"),
+        ("t", "set maximum runtime filter"),
         ("Space", "mark/unmark selected"),
         ("Esc", "clear all marks"),
         ("G", "tag marked movie(s)"),
@@ -45,13 +47,15 @@ HELP_SECTIONS = [
         ("W", "mark watchlist"),
         ("R", "random watchlist pick"),
         ("F", "recommended for you"),
+        ("A", "aging watchlist (oldest first)"),
+        ("H", "watch activity heatmap"),
         ("P", "poster wall (kitty only)"),
         ("T", "trash: browse/restore/purge"),
         ("S", "stats screen"),
         ("C", "collections screen"),
         ("B", "back up database now"),
         ("X", "export to CSV/JSON"),
-        ("I", "import from CSV/JSON"),
+        ("I", "import from CSV/JSON/Letterboxd"),
     ]),
     ("MOVIE DETAIL SCREEN", [
         ("r", "set your rating (0-10)"),
@@ -61,6 +65,7 @@ HELP_SECTIONS = [
         ("t", "set watched date to today"),
         ("c", "+1 rewatch count"),
         ("v", "view rewatch history"),
+        ("o", "where to watch + trailer (needs TMDb key)"),
         ("N", "advance season (series)"),
         ("e", "edit notes"),
         ("E", "edit all fields at once"),
@@ -69,7 +74,7 @@ HELP_SECTIONS = [
         ("x", "delete this movie"),
     ]),
     ("OTHER", [
-        ("K", "set/update OMDb API key"),
+        ("K", "set/update API keys (OMDb, TMDb)"),
         ("?", "this help screen"),
         ("q / Esc", "back / quit"),
     ]),
@@ -676,6 +681,12 @@ def add_manually(stdscr, db: DB) -> int | None:
     if not title:
         return None
     year = prompt(stdscr, "Year (optional)") or ""
+    existing = db.conn.execute(
+        "SELECT id FROM movies WHERE deleted_at IS NULL AND title = ? COLLATE NOCASE AND year = ?",
+        (title, year),
+    ).fetchone()
+    if existing and not confirm(stdscr, f"'{title}' ({year or '?'}) is already in your library - add anyway?"):
+        return None
     total_seasons = None
     if media_type == "series":
         seasons_str = prompt(stdscr, "Total seasons (optional)") or ""
@@ -1024,7 +1035,7 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                         stdscr.addstr(y, 2, wline[: content_w - 3])
                         y += 1
 
-            footer = "r rating  n rank  M rated  w watched  t today  c +rewatch  v history  "
+            footer = "r rating  n rank  M rated  w watched  t today  c +rewatch  v history  o watch  "
             if is_series:
                 footer += "N +season  "
             footer += "e notes  E edit all  p poster  u refresh poster  x delete  q back"
@@ -1098,6 +1109,27 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                 else:
                     lines = [f"REWATCH HISTORY: {row['title']}", ""]
                     lines.extend(history)
+                    lines.append("")
+                    lines.append("Press any key to close.")
+                    show_text_screen(stdscr, "\n".join(lines))
+            elif ch == ord("o"):
+                try:
+                    providers = tmdb.get_watch_providers(row["imdb_id"], row["media_type"])
+                except tmdb.TmdbError as e:
+                    flash(stdscr, str(e))
+                else:
+                    try:
+                        trailer_url = tmdb.get_trailer_url(row["imdb_id"], row["media_type"])
+                    except tmdb.TmdbError:
+                        trailer_url = None
+                    lines = [f"WHERE TO WATCH: {row['title']}", ""]
+                    if providers:
+                        for label, names in providers:
+                            lines.append(f"{label}: {', '.join(names)}")
+                    else:
+                        lines.append("No streaming/rent/buy sources found for this title/region.")
+                    lines.append("")
+                    lines.append(f"Trailer: {trailer_url}" if trailer_url else "Trailer: not found")
                     lines.append("")
                     lines.append("Press any key to close.")
                     show_text_screen(stdscr, "\n".join(lines))
@@ -1472,6 +1504,35 @@ def recommendations_screen(stdscr, db: DB) -> None:
         movie_detail(stdscr, db, picked[0]["id"])
 
 
+# ---------------------------------------------------- aging watchlist ui --
+
+AGING_WATCHLIST_DAYS = 90
+
+
+def aging_watchlist_screen(stdscr, db: DB) -> None:
+    """Watchlist titles that have been sitting unwatched for a while,
+    oldest first - a nudge to dig out the backlog rather than just
+    adding more to it."""
+    rows = db.aging_watchlist(AGING_WATCHLIST_DAYS)
+    if not rows:
+        flash(stdscr, f"Nothing's been sitting on your watchlist {AGING_WATCHLIST_DAYS}+ days.")
+        return
+
+    today = date.today()
+
+    def formatter(m):
+        try:
+            added = date.fromisoformat((m["added_at"] or "")[:10])
+            days = (today - added).days
+        except ValueError:
+            days = "?"
+        return f"{m['title']} ({m['year'] or '?'})  added {days}d ago"
+
+    picked = choose_from_list(stdscr, "AGING WATCHLIST (oldest first)", rows, formatter)
+    if picked:
+        movie_detail(stdscr, db, picked["id"])
+
+
 # ------------------------------------------------------- dramatic random --
 
 RANDOM_SPIN_STEPS = 16
@@ -1585,6 +1646,75 @@ def dramatic_random_pick(stdscr, db: DB) -> int | None:
     else:
         curses.napms(900)
     return final["id"]
+
+
+# ------------------------------------------------------------ heatmap ui --
+
+HEATMAP_WEEKS = 26
+
+
+def _heatmap_attr(count: int, max_count: int) -> int:
+    """Intensity color for a heatmap cell, reusing the existing rating
+    color thresholds (green/yellow/red) as a ready-made 3-step gradient
+    since the theme doesn't define a dedicated one."""
+    if count <= 0:
+        return dim_attr()
+    if max_count <= 1:
+        return rating_attr(8.0)
+    ratio = count / max_count
+    if ratio >= 0.66:
+        return rating_attr(8.0) | curses.A_BOLD
+    if ratio >= 0.33:
+        return rating_attr(6.0)
+    return rating_attr(3.0)
+
+
+def watch_heatmap_screen(stdscr, db: DB) -> None:
+    """A GitHub-style contribution grid of watch activity (first watches
+    plus logged rewatches) over the last several months, one column per
+    week and one row per weekday."""
+    h, w = stdscr.getmaxyx()
+    weeks = min(HEATMAP_WEEKS, max(4, (w - 10) // 2))
+    today = date.today()
+    start_of_week = today - timedelta(days=today.weekday())  # Monday
+    grid_start = start_of_week - timedelta(weeks=weeks - 1)
+    counts = db.watch_activity_by_date(since=grid_start.isoformat())
+    max_count = max(counts.values(), default=0)
+
+    stdscr.clear()
+    draw_box(stdscr, 0, 0, h, w, dim_attr())
+    safe_addstr(stdscr, 1, 2, "WATCH ACTIVITY", accent_attr() | curses.A_BOLD)
+
+    grid_x, grid_y = 6, 4
+    for row_i, label in enumerate(["Mon", "", "Wed", "", "Fri", "", ""]):
+        if grid_y + row_i < h - 3:
+            safe_addstr(stdscr, grid_y + row_i, 2, f"{label:<3}", dim_attr())
+
+    total_events = active_days = 0
+    last_month = None
+    for col in range(weeks):
+        week_start = grid_start + timedelta(weeks=col)
+        if week_start.month != last_month:
+            last_month = week_start.month
+            safe_addstr(stdscr, grid_y - 1, grid_x + col * 2, week_start.strftime("%b"), dim_attr())
+        for row in range(7):
+            day = week_start + timedelta(days=row)
+            if day > today:
+                continue
+            count = counts.get(day.isoformat(), 0)
+            total_events += count
+            active_days += 1 if count else 0
+            safe_addstr(stdscr, grid_y + row, grid_x + col * 2, "██", _heatmap_attr(count, max_count))
+
+    summary_y = min(grid_y + 9, h - 2)
+    safe_addstr(
+        stdscr, summary_y, 2,
+        f"{active_days} active day(s), {total_events} watch event(s) in the last {weeks} weeks.",
+        curses.A_NORMAL,
+    )
+    safe_addstr(stdscr, h - 1, 0, "Press any key to close.", dim_attr())
+    stdscr.refresh()
+    stdscr.getch()
 
 
 # --------------------------------------------------------------- stats ui --
@@ -1704,6 +1834,44 @@ def _read_import_rows(path: Path) -> list[dict]:
         return list(csv.DictReader(f))
 
 
+def _is_letterboxd_export(rows: list[dict]) -> bool:
+    return bool(rows) and "Letterboxd URI" in rows[0]
+
+
+def _normalize_letterboxd_rows(rows: list[dict], path: Path) -> list[dict]:
+    """Map a Letterboxd data-export CSV (watched.csv, ratings.csv,
+    diary.csv, or watchlist.csv - from https://letterboxd.com/settings/data/)
+    onto this app's import row schema, so it flows through the same
+    dedup/insert logic as a native export. Letterboxd's 0.5-5 star
+    ratings are scaled to this app's 0-10 scale. A diary.csv row marked
+    'Rewatch' logs a rewatch on the existing title instead of being
+    skipped as a plain duplicate (see import_movies)."""
+    is_watchlist = "watchlist" in path.stem.lower()
+    out = []
+    for row in rows:
+        rating_raw = (row.get("Rating") or "").strip()
+        my_rating = ""
+        if rating_raw:
+            try:
+                my_rating = str(float(rating_raw) * 2)
+            except ValueError:
+                my_rating = ""
+        watched_date = (row.get("Watched Date") or row.get("Date") or "").strip()
+        out.append(
+            {
+                "title": row.get("Name", ""),
+                "year": row.get("Year", ""),
+                "media_type": "movie",
+                "status": "watchlist" if is_watchlist else "watched",
+                "watched_date": "" if is_watchlist else watched_date,
+                "my_rating": my_rating,
+                "tags": row.get("Tags", ""),
+                "_rewatch": "1" if (row.get("Rewatch") or "").strip().lower() == "yes" else "",
+            }
+        )
+    return out
+
+
 def _row_int(row: dict, key: str) -> int | None:
     val = (row.get(key) or "").strip()
     return int(val) if val.lstrip("-").isdigit() else None
@@ -1756,6 +1924,9 @@ def import_movies(stdscr, db: DB) -> None:
     if not rows:
         flash(stdscr, "No rows found to import.")
         return
+    if _is_letterboxd_export(rows):
+        rows = _normalize_letterboxd_rows(rows, path)
+        flash(stdscr, f"Detected a Letterboxd export ({len(rows)} rows).")
 
     existing_imdb_ids = {
         r["imdb_id"] for r in db.conn.execute(
@@ -1779,6 +1950,13 @@ def import_movies(stdscr, db: DB) -> None:
             skipped += 1
             continue
         if not imdb_id and (title.lower(), year) in existing_title_years:
+            if (row.get("_rewatch") or "").strip() == "1":
+                existing_row = db.conn.execute(
+                    "SELECT id FROM movies WHERE title = ? COLLATE NOCASE AND year = ? AND deleted_at IS NULL",
+                    (title, year),
+                ).fetchone()
+                if existing_row:
+                    db.log_rewatch(existing_row["id"], (row.get("watched_date") or "").strip() or None)
             skipped += 1
             continue
 
@@ -1837,6 +2015,8 @@ class App:
         self.type_idx = 0
         self.tag_filter: str | None = None
         self.decade_filter: int | None = None
+        self.rating_min: float | None = None
+        self.runtime_max: int | None = None
         self.idx = 0
         self.top = 0
         self.last_preview_key = "unset"
@@ -1854,7 +2034,8 @@ class App:
         return self.db.list(
             sort=self.sort, query=self.query, status=self.status_filter,
             tag=self.tag_filter, media_type=self.type_filter,
-            decade=self.decade_filter,
+            decade=self.decade_filter, rating_min=self.rating_min,
+            runtime_max=self.runtime_max,
         )
 
     def cycle_tag_filter(self) -> None:
@@ -1932,6 +2113,10 @@ class App:
             sub += f"  tag:'{self.tag_filter}'"
         if self.decade_filter is not None:
             sub += f"  decade:{self.decade_filter}s"
+        if self.rating_min is not None:
+            sub += f"  rating>={self.rating_min:g}"
+        if self.runtime_max is not None:
+            sub += f"  runtime<={self.runtime_max}m"
         if self.query:
             sub += f"  filter:'{self.query}'"
         if self.selected_ids:
@@ -2267,6 +2452,32 @@ class App:
                 clear_kitty_images()
                 self.last_preview_key = "unset"
                 recommendations_screen(stdscr, self.db)
+            elif ch == ord("A"):
+                clear_kitty_images()
+                self.last_preview_key = "unset"
+                aging_watchlist_screen(stdscr, self.db)
+            elif ch == ord("H"):
+                clear_kitty_images()
+                self.last_preview_key = "unset"
+                watch_heatmap_screen(stdscr, self.db)
+            elif ch == ord("r"):
+                val = prompt(stdscr, "Minimum rating filter, 0-10 (blank = clear)", "" if self.rating_min is None else str(self.rating_min))
+                if val is not None:
+                    try:
+                        self.rating_min = float(val) if val.strip() else None
+                    except ValueError:
+                        flash(stdscr, "Enter a number between 0 and 10.")
+                    else:
+                        self.idx = 0
+            elif ch == ord("t"):
+                val = prompt(stdscr, "Maximum runtime filter, minutes (blank = clear)", "" if self.runtime_max is None else str(self.runtime_max))
+                if val is not None:
+                    try:
+                        self.runtime_max = int(val) if val.strip() else None
+                    except ValueError:
+                        flash(stdscr, "Enter a whole number of minutes.")
+                    else:
+                        self.idx = 0
             elif ch == ord(" "):
                 if movies:
                     mid = movies[self.idx]["id"]
@@ -2308,10 +2519,20 @@ class App:
                 self.status_idx = (self.status_idx + 1) % len(STATUS_CYCLE)
                 self.idx = 0
             elif ch == ord("K"):
+                changed = False
                 key = prompt(stdscr, "OMDb API key", config.get_api_key() or "")
                 if key:
                     config.set_api_key(key.strip())
-                    flash(stdscr, "API key saved.")
+                    changed = True
+                tkey = prompt(
+                    stdscr, "TMDb API key (optional, for 'o' in detail view)",
+                    config.get_tmdb_api_key() or "",
+                )
+                if tkey:
+                    config.set_tmdb_api_key(tkey.strip())
+                    changed = True
+                if changed:
+                    flash(stdscr, "API key(s) saved.")
             elif ch == ord("?"):
                 clear_kitty_images()
                 self.last_preview_key = "unset"

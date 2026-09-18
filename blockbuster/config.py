@@ -75,3 +75,16 @@ def set_api_key(key: str) -> None:
     cfg = load_config()
     cfg["omdb_api_key"] = key
     save_config(cfg)
+
+
+def get_tmdb_api_key() -> str | None:
+    env_key = os.environ.get("TMDB_API_KEY")
+    if env_key:
+        return env_key
+    return load_config().get("tmdb_api_key")
+
+
+def set_tmdb_api_key(key: str) -> None:
+    cfg = load_config()
+    cfg["tmdb_api_key"] = key
+    save_config(cfg)
