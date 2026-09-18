@@ -54,7 +54,7 @@ HELP_SECTIONS = [
         ("S", "stats screen"),
         ("C", "collections screen"),
         ("B", "back up database now"),
-        ("X", "export to CSV/JSON"),
+        ("X", "export to CSV/JSON/Obsidian vault"),
         ("I", "import from CSV/JSON/Letterboxd"),
     ]),
     ("MOVIE DETAIL SCREEN", [
@@ -1797,9 +1797,12 @@ EXPORT_FIELDS = [
 
 def export_movies(stdscr, db: DB) -> None:
     """Export the active (non-deleted) collection to a CSV or JSON file
-    under config.EXPORT_DIR."""
-    fmt = choose_from_list(stdscr, "Export format:", ["CSV", "JSON"], lambda x: x)
+    under config.EXPORT_DIR, or to an Obsidian vault directory."""
+    fmt = choose_from_list(stdscr, "Export format:", ["CSV", "JSON", "Obsidian vault"], lambda x: x)
     if not fmt:
+        return
+    if fmt == "Obsidian vault":
+        _export_obsidian(stdscr, db)
         return
     movies = db.list(sort="added")
     config.ensure_dirs()
@@ -1823,6 +1826,29 @@ def export_movies(stdscr, db: DB) -> None:
         dest.write_text(json.dumps(rows, indent=2))
 
     flash(stdscr, f"Exported {len(rows)} movies to {dest}")
+
+
+def _export_obsidian(stdscr, db: DB) -> None:
+    """In-app entry point for the same vault export as
+    `blockbuster --export-obsidian DIR` (see obsidian_export.export_vault)."""
+    default_dir = str(config.DATA_DIR / "obsidian-vault")
+    path_str = prompt(stdscr, "Obsidian vault directory", default_dir)
+    if not path_str:
+        return
+    dest = Path(path_str).expanduser()
+    flash(stdscr, f"Exporting Obsidian vault to {dest}...")
+    from . import obsidian_export
+
+    try:
+        counts = obsidian_export.export_vault(db, dest)
+    except OSError as e:
+        flash(stdscr, f"Failed to export vault: {e}")
+        return
+    flash(
+        stdscr,
+        f"Exported {counts['movies']} titles, {counts['people']} people, "
+        f"{counts['genres']} genres, {counts['collections']} collections to {dest}",
+    )
 
 
 def _read_import_rows(path: Path) -> list[dict]:

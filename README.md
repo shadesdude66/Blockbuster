@@ -162,7 +162,7 @@ just that combination.
 | `S` | stats screen: totals, watch time, averages, top genres, decades |
 | `C` | collections: your tags as franchises, with watched/total count, average rating, and a ★ once complete; `Enter` drills into a tag's titles by year |
 | `B` | back up the database now (timestamped copy) |
-| `X` | export the collection to CSV or JSON |
+| `X` | export the collection to CSV, JSON, or an Obsidian vault |
 | `I` | import from a CSV/JSON file (same format as `X`'s export, or a raw Letterboxd export - see below); skips anything already present, matched by IMDb id or title+year |
 | `?` | full help screen |
 | `q` | back / quit |
@@ -224,6 +224,9 @@ genre, director, cast, or posters — re-fetch those later by deleting
 and re-adding a title via OMDb search (`a`) if you want them filled in.
 
 ### Obsidian vault export
+
+Press `X` in the app and pick "Obsidian vault", or run it from the
+command line without opening the app:
 
 ```
 blockbuster --export-obsidian ~/notes/BlockbusterVault
