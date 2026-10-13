@@ -45,6 +45,17 @@ CREATE TABLE IF NOT EXISTS movie_tags (
     PRIMARY KEY (movie_id, tag_id)
 );
 
+CREATE TABLE IF NOT EXISTS formats (
+    id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE
+);
+
+CREATE TABLE IF NOT EXISTS movie_formats (
+    movie_id  INTEGER NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
+    format_id INTEGER NOT NULL REFERENCES formats(id) ON DELETE CASCADE,
+    PRIMARY KEY (movie_id, format_id)
+);
+
 CREATE TABLE IF NOT EXISTS rewatch_log (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     movie_id     INTEGER NOT NULL REFERENCES movies(id) ON DELETE CASCADE,
@@ -217,7 +228,8 @@ class DB:
         ).fetchone()
 
     def list(self, sort: str = "rank", query: str = "", status: str | None = None,
-              tag: str | None = None, media_type: str | None = None,
+              tag: str | None = None, format: str | None = None,
+              media_type: str | None = None,
               decade: int | None = None, rating_min: float | None = None,
               runtime_max: int | None = None) -> list[sqlite3.Row]:
         col, direction = SORT_FIELDS.get(sort, SORT_FIELDS["rank"])
@@ -229,6 +241,12 @@ class DB:
                 " JOIN tags ON tags.id = movie_tags.tag_id AND tags.name = ?"
             )
             params.append(tag)
+        if format:
+            sql += (
+                " JOIN movie_formats ON movie_formats.movie_id = movies.id"
+                " JOIN formats ON formats.id = movie_formats.format_id AND formats.name = ?"
+            )
+            params.append(format)
         sql += " WHERE movies.deleted_at IS NULL"
         if query:
             sql += (
@@ -357,6 +375,56 @@ class DB:
                 self.conn.execute(
                     "INSERT OR IGNORE INTO movie_tags (movie_id, tag_id) VALUES (?, ?)",
                     (movie_id, tag_id),
+                )
+        self.conn.commit()
+
+    # ---------------------------------------------------------- formats --
+
+    def all_formats(self) -> list[str]:
+        return [row["name"] for row in self.conn.execute("SELECT name FROM formats ORDER BY name COLLATE NOCASE")]
+
+    def get_formats_for_movie(self, movie_id: int) -> list[str]:
+        rows = self.conn.execute(
+            "SELECT formats.name FROM formats "
+            "JOIN movie_formats ON movie_formats.format_id = formats.id "
+            "WHERE movie_formats.movie_id = ? ORDER BY formats.name COLLATE NOCASE",
+            (movie_id,),
+        )
+        return [row["name"] for row in rows]
+
+    def set_formats_for_movie(self, movie_id: int, names: list[str]) -> None:
+        """Replace the full set of formats on a movie with `names`."""
+        self.conn.execute("DELETE FROM movie_formats WHERE movie_id = ?", (movie_id,))
+        for name in names:
+            name = name.strip()
+            if not name:
+                continue
+            self.conn.execute("INSERT OR IGNORE INTO formats (name) VALUES (?)", (name,))
+            format_id = self.conn.execute(
+                "SELECT id FROM formats WHERE name = ? COLLATE NOCASE", (name,)
+            ).fetchone()["id"]
+            self.conn.execute(
+                "INSERT OR IGNORE INTO movie_formats (movie_id, format_id) VALUES (?, ?)",
+                (movie_id, format_id),
+            )
+        self.conn.commit()
+
+    def add_formats_to_movies(self, movie_ids: list[int], names: list[str]) -> None:
+        """Add each format in `names` to each movie in `movie_ids`, on top
+        of whatever formats they already have - the format counterpart of
+        add_tags_to_movies(), for bulk-adding from the list screen."""
+        for name in names:
+            name = name.strip()
+            if not name:
+                continue
+            self.conn.execute("INSERT OR IGNORE INTO formats (name) VALUES (?)", (name,))
+            format_id = self.conn.execute(
+                "SELECT id FROM formats WHERE name = ? COLLATE NOCASE", (name,)
+            ).fetchone()["id"]
+            for movie_id in movie_ids:
+                self.conn.execute(
+                    "INSERT OR IGNORE INTO movie_formats (movie_id, format_id) VALUES (?, ?)",
+                    (movie_id, format_id),
                 )
         self.conn.commit()
 

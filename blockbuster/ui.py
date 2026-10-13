@@ -31,12 +31,14 @@ HELP_SECTIONS = [
         ("Tab", "cycle status filter"),
         ("y", "cycle type filter"),
         ("g", "cycle tag filter"),
+        ("f", "cycle format filter"),
         ("D", "cycle decade filter"),
         ("r", "set minimum rating filter"),
         ("t", "set maximum runtime filter"),
         ("Space", "mark/unmark selected"),
         ("Esc", "clear all marks"),
         ("G", "tag marked movie(s)"),
+        ("O", "add format to marked movie(s)"),
     ]),
     ("MOVIES & TV SHOWS", [
         ("a", "add via OMDb search"),
@@ -117,6 +119,7 @@ ROW_RUNTIME_WIDTH = 9
 ROW_MINE_WIDTH = 6
 ROW_IMDB_WIDTH = 6
 ROW_TAGS_WIDTH = 21
+ROW_FORMATS_WIDTH = 13
 ROW_TITLE_WIDTH_DEFAULT = 35
 ROW_TITLE_WIDTH_SOFT_MIN = 15
 ROW_TITLE_WIDTH_HARD_MIN = 8
@@ -125,13 +128,14 @@ ROW_TITLE_WIDTH_HARD_MIN = 8
 def compute_row_layout(content_w: int):
     """Pick a title width and which optional columns fit in content_w.
 
-    Shrinks the title column first, then drops Tags/Runtime/Mine/IMDb (in
-    that order - Tags first, since it's the newest/most optional column)
+    Shrinks the title column first, then drops Formats/Tags/Runtime/Mine/
+    IMDb (in that order - Formats first, since it's the newest/most
+    optional column)
     if it's still too tight, then shrinks the title further as a last
     resort so the poster panel can show even on narrow terminals.
     """
     title_w = ROW_TITLE_WIDTH_DEFAULT
-    show_runtime = show_mine = show_imdb = show_tags = True
+    show_runtime = show_mine = show_imdb = show_tags = show_formats = True
 
     def total():
         return (
@@ -141,10 +145,13 @@ def compute_row_layout(content_w: int):
             + (ROW_MINE_WIDTH if show_mine else 0)
             + (ROW_IMDB_WIDTH if show_imdb else 0)
             + (ROW_TAGS_WIDTH if show_tags else 0)
+            + (ROW_FORMATS_WIDTH if show_formats else 0)
         )
 
     while total() > content_w and title_w > ROW_TITLE_WIDTH_SOFT_MIN:
         title_w -= 1
+    while total() > content_w and show_formats:
+        show_formats = False
     while total() > content_w and show_tags:
         show_tags = False
     while total() > content_w and show_runtime:
@@ -155,7 +162,7 @@ def compute_row_layout(content_w: int):
         show_imdb = False
     while total() > content_w and title_w > ROW_TITLE_WIDTH_HARD_MIN:
         title_w -= 1
-    return title_w, show_runtime, show_mine, show_imdb, show_tags
+    return title_w, show_runtime, show_mine, show_imdb, show_tags, show_formats
 
 
 # ------------------------------------------------------------ theming --
@@ -726,6 +733,8 @@ def add_manually(stdscr, db: DB) -> int | None:
 #   date    - blank, or a YYYY-MM-DD date
 #   tags    - comma-separated tag names; not a movies column, saved via
 #             db.set_tags_for_movie() instead of db.update()
+#   formats - comma-separated format names; likewise saved via
+#             db.set_formats_for_movie()
 # poster_path, imdb_id, and added_at are left out: they're managed by the
 # app itself (poster downloads, OMDb lookups, add timestamp), not
 # free-text fields a user would hand-edit.
@@ -747,6 +756,7 @@ EDIT_FORM_FIELDS = [
     ("director", "Director", "text"),
     ("actors", "Actors", "text"),
     ("tags", "Tags (comma-separated)", "tags"),
+    ("formats", "Formats (comma-separated)", "formats"),
     ("plot", "Plot", "text"),
     ("notes", "Notes", "text"),
 ]
@@ -830,6 +840,9 @@ def edit_movie_form(stdscr, db: DB, movie_id: int) -> None:
     for key, _, kind in EDIT_FORM_FIELDS:
         if kind == "tags":
             values[key] = ", ".join(db.get_tags_for_movie(movie_id))
+            continue
+        if kind == "formats":
+            values[key] = ", ".join(db.get_formats_for_movie(movie_id))
             continue
         raw = row[key]
         values[key] = str(raw) if raw is not None else ""
@@ -922,6 +935,8 @@ def edit_movie_form(stdscr, db: DB, movie_id: int) -> None:
         val = values[key].strip()
         if kind == "tags":
             db.set_tags_for_movie(movie_id, val.split(","))
+        elif kind == "formats":
+            db.set_formats_for_movie(movie_id, val.split(","))
         elif kind == "int":
             updates[key] = int(val) if val else None
         elif kind == "int0":
@@ -971,6 +986,7 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
             rank = row["my_rank"] if row["my_rank"] is not None else "-"
             watched = row["watched_date"] or "-"
             tags = db.get_tags_for_movie(movie_id)
+            formats = db.get_formats_for_movie(movie_id)
 
             is_series = row["media_type"] == "series"
             runtime_label = "Episode runtime:" if is_series else "Runtime:"
@@ -999,6 +1015,7 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                 ("Director:", row["director"] or "-", None),
                 ("Actors:", row["actors"] or "-", None),
                 ("Tags:", ", ".join(tags) if tags else "-", None),
+                ("Formats:", ", ".join(formats) if formats else "-", None),
                 ("Watched date:", watched, None),
                 ("Rewatch count:", row["rewatch_count"], None),
                 ("Poster cached:", "yes" if row["poster_path"] else "no", None),
@@ -1791,7 +1808,7 @@ def stats_screen(stdscr, db: DB) -> None:
 EXPORT_FIELDS = [
     "id", "title", "year", "media_type", "total_seasons", "current_season", "rated", "genre",
     "director", "actors", "plot", "runtime_minutes", "imdb_rating", "my_rating", "my_rank",
-    "status", "watched_date", "rewatch_count", "notes", "tags", "added_at",
+    "status", "watched_date", "rewatch_count", "notes", "tags", "formats", "added_at",
 ]
 
 
@@ -1811,8 +1828,9 @@ def export_movies(stdscr, db: DB) -> None:
 
     rows = []
     for m in movies:
-        row = {k: m[k] for k in EXPORT_FIELDS if k != "tags"}
+        row = {k: m[k] for k in EXPORT_FIELDS if k not in ("tags", "formats")}
         row["tags"] = ", ".join(db.get_tags_for_movie(m["id"]))
+        row["formats"] = ", ".join(db.get_formats_for_movie(m["id"]))
         rows.append(row)
 
     if fmt == "CSV":
@@ -1847,7 +1865,7 @@ def _export_obsidian(stdscr, db: DB) -> None:
     flash(
         stdscr,
         f"Exported {counts['movies']} titles, {counts['people']} people, "
-        f"{counts['genres']} genres, {counts['collections']} collections to {dest}",
+        f"{counts['genres']} genres, {counts['collections']} collections, {counts['formats']} formats to {dest}",
     )
 
 
@@ -2018,6 +2036,9 @@ def import_movies(stdscr, db: DB) -> None:
         tags = [t.strip() for t in (row.get("tags") or "").split(",") if t.strip()]
         if tags:
             db.set_tags_for_movie(movie_id, tags)
+        formats = [f.strip() for f in (row.get("formats") or "").split(",") if f.strip()]
+        if formats:
+            db.set_formats_for_movie(movie_id, formats)
         if imdb_id:
             existing_imdb_ids.add(imdb_id)
         existing_title_years.add((title.lower(), year))
@@ -2040,6 +2061,7 @@ class App:
         self.status_idx = 0
         self.type_idx = 0
         self.tag_filter: str | None = None
+        self.format_filter: str | None = None
         self.decade_filter: int | None = None
         self.rating_min: float | None = None
         self.runtime_max: int | None = None
@@ -2059,7 +2081,8 @@ class App:
     def movies(self):
         return self.db.list(
             sort=self.sort, query=self.query, status=self.status_filter,
-            tag=self.tag_filter, media_type=self.type_filter,
+            tag=self.tag_filter, format=self.format_filter,
+            media_type=self.type_filter,
             decade=self.decade_filter, rating_min=self.rating_min,
             runtime_max=self.runtime_max,
         )
@@ -2074,6 +2097,16 @@ class App:
         self.tag_filter = options[(i + 1) % len(options)]
         self.idx = 0
 
+    def cycle_format_filter(self) -> None:
+        formats = self.db.all_formats()
+        options = [None] + formats
+        try:
+            i = options.index(self.format_filter)
+        except ValueError:
+            i = 0
+        self.format_filter = options[(i + 1) % len(options)]
+        self.idx = 0
+
     def cycle_decade_filter(self) -> None:
         decades = self.db.all_decades()
         options = [None] + decades
@@ -2086,7 +2119,7 @@ class App:
 
     def bulk_targets(self, movies) -> list[int]:
         """Marked movie ids, or just the currently selected one if
-        nothing's marked - the target set for G/d/w/W actions."""
+        nothing's marked - the target set for G/O/d/w/W actions."""
         if self.selected_ids:
             return list(self.selected_ids)
         if movies:
@@ -2137,6 +2170,8 @@ class App:
             sub += f"  type:{self.type_filter}"
         if self.tag_filter:
             sub += f"  tag:'{self.tag_filter}'"
+        if self.format_filter:
+            sub += f"  format:'{self.format_filter}'"
         if self.decade_filter is not None:
             sub += f"  decade:{self.decade_filter}s"
         if self.rating_min is not None:
@@ -2152,7 +2187,7 @@ class App:
         stdscr.addstr(0, 0, header[: w - 1], bar_attr())
         stdscr.addstr(0, max(len(header) + 1, w - len(sub) - 1), sub[: max(w - len(header) - 2, 0)])
 
-        title_w, show_runtime, show_mine, show_imdb, show_tags = compute_row_layout(content_w - interior_left)
+        title_w, show_runtime, show_mine, show_imdb, show_tags, show_formats = compute_row_layout(content_w - interior_left)
 
         col_y = 2
         header_parts = [" ", f"{'#':>3}", f"{'Rk':>4}", f"{'Ty':<2}", f"{'Title':<{title_w}}", f"{'Rated':<6}", f"{'Year':<6}"]
@@ -2164,6 +2199,8 @@ class App:
             header_parts.append(f"{'IMDb':>5}")
         if show_tags:
             header_parts.append(f"{'Tags':<20}")
+        if show_formats:
+            header_parts.append(f"{'Format':<12}")
         header_parts.append("Status")
         cols = " ".join(header_parts)
         stdscr.addstr(col_y, interior_left, cols[: content_w - interior_left], accent_attr() | curses.A_UNDERLINE)
@@ -2213,6 +2250,9 @@ class App:
             if show_tags:
                 tags_str = ", ".join(self.db.get_tags_for_movie(m["id"])) or "-"
                 put(f"{tags_str[:20]:<20}", base_attr)
+            if show_formats:
+                formats_str = ", ".join(self.db.get_formats_for_movie(m["id"])) or "-"
+                put(f"{formats_str[:12]:<12}", base_attr)
             watched = m["status"] == "watched"
             status_symbol = "✓" if watched else "-"
             status_attr = base_attr if (is_current or not watched) else blue_attr()
@@ -2234,8 +2274,8 @@ class App:
                 safe_addstr(stdscr, h - 3, interior_left + 1, hint[: max(content_w - interior_left - 2, 0)], dim_attr())
 
         footer = (
-            "a add  m manual  Enter details  E edit  / filter  s sort  Tab status  y type  g tag  "
-            "Space mark  G add tag(s)  d delete  u undo  w watched  W watchlist  "
+            "a add  m manual  Enter details  E edit  / filter  s sort  Tab status  y type  g tag  f format  "
+            "Space mark  G add tag(s)  O add format(s)  d delete  u undo  w watched  W watchlist  "
             "R random  P poster wall  T trash  S stats  C collections  B backup  X export  I import  K api-key  ? help  q quit"
         )
         stdscr.addstr(h - 1, 0, footer[: w - 1], dim_attr())
@@ -2318,6 +2358,9 @@ class App:
         tags = self.db.get_tags_for_movie(movie["id"])
         if tags:
             fields.append(("Tags:", ", ".join(tags), None))
+        formats = self.db.get_formats_for_movie(movie["id"])
+        if formats:
+            fields.append(("Formats:", ", ".join(formats), None))
 
         for label, value, rating_val in fields:
             if row >= y + h:
@@ -2472,6 +2515,8 @@ class App:
                 self.idx = 0
             elif ch == ord("g"):
                 self.cycle_tag_filter()
+            elif ch == ord("f"):
+                self.cycle_format_filter()
             elif ch == ord("D"):
                 self.cycle_decade_filter()
             elif ch == ord("F"):
@@ -2531,6 +2576,25 @@ class App:
                         names = [n.strip() for n in val.split(",") if n.strip()]
                         if names:
                             self.db.add_tags_to_movies(target_ids, names)
+                            flash(stdscr, f"Added {', '.join(names)} to {len(target_ids)} movie(s).")
+                            self.selected_ids.clear()
+            elif ch == ord("O"):
+                target_ids = self.bulk_targets(movies)
+                if len(target_ids) > 1:
+                    label = f"Add format(s) to {len(target_ids)} selected movies (comma-separated)"
+                elif target_ids:
+                    title = next((m["title"] for m in movies if m["id"] == target_ids[0]), "this movie")
+                    label = f"Add format(s) to '{title}' (comma-separated)"
+                else:
+                    label = ""
+                if not target_ids:
+                    flash(stdscr, "No movies to add a format to.")
+                else:
+                    val = prompt(stdscr, label)
+                    if val:
+                        names = [n.strip() for n in val.split(",") if n.strip()]
+                        if names:
+                            self.db.add_formats_to_movies(target_ids, names)
                             flash(stdscr, f"Added {', '.join(names)} to {len(target_ids)} movie(s).")
                             self.selected_ids.clear()
             elif ch == ord("/"):
@@ -2593,7 +2657,8 @@ def main() -> None:
             db.close()
         print(
             f"Exported {counts['movies']} titles, {counts['people']} people, "
-            f"{counts['genres']} genres, and {counts['collections']} collections "
+            f"{counts['genres']} genres, {counts['collections']} collections, "
+            f"and {counts['formats']} formats "
             f"to {args.export_obsidian}"
         )
         return

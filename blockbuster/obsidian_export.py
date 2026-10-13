@@ -1,8 +1,8 @@
 """Export the Blockbuster library to an Obsidian-compatible markdown vault.
 
 Produces one note per movie/series (with YAML frontmatter for rating,
-genre, director, tags, etc.), plus stub notes per director/actor, genre,
-and collection/tag so Obsidian's backlinks and graph view have something
+genre, director, tags, formats, etc.), plus stub notes per director/actor,
+genre, collection/tag, and format so Obsidian's backlinks and graph view have something
 to connect, and a Stats.md mirroring the app's stats screen. This is a
 one-shot snapshot, not a live sync - re-run it to refresh.
 """
@@ -78,11 +78,13 @@ def export_vault(db: DB, dest: Path) -> dict:
     people_dir = dest / "People"
     genres_dir = dest / "Genres"
     collections_dir = dest / "Collections"
+    formats_dir = dest / "Formats"
     posters_dir = dest / "Posters"
     movies_dir.mkdir(parents=True, exist_ok=True)
     people_dir.mkdir(parents=True, exist_ok=True)
     genres_dir.mkdir(parents=True, exist_ok=True)
     collections_dir.mkdir(parents=True, exist_ok=True)
+    formats_dir.mkdir(parents=True, exist_ok=True)
     posters_dir.mkdir(parents=True, exist_ok=True)
 
     rows = db.list(sort="title")
@@ -91,6 +93,7 @@ def export_vault(db: DB, dest: Path) -> dict:
     people: dict[str, list[tuple[str, str]]] = defaultdict(list)
     genres: dict[str, list[str]] = defaultdict(list)
     collections_map: dict[str, list[str]] = defaultdict(list)
+    formats_map: dict[str, list[str]] = defaultdict(list)
     index_by_status: dict[str, list[tuple[str, str]]] = defaultdict(list)
 
     for row in rows:
@@ -103,6 +106,7 @@ def export_vault(db: DB, dest: Path) -> dict:
         actors = _split_list(row["actors"])
         genre_list = _split_list(row["genre"])
         tags = db.get_tags_for_movie(row["id"])
+        formats = db.get_formats_for_movie(row["id"])
         rewatches = db.get_rewatch_history(row["id"])
 
         poster_embed = ""
@@ -118,7 +122,9 @@ def export_vault(db: DB, dest: Path) -> dict:
         fm_tags = [
             "blockbuster/series" if row["media_type"] == "series" else "blockbuster/movie",
             f"blockbuster/{row['status']}",
-        ] + [f"blockbuster/{t.replace(' ', '-')}" for t in tags]
+        ] + [f"blockbuster/{t.replace(' ', '-')}" for t in tags] + [
+            f"blockbuster/format/{f.replace(' ', '-')}" for f in formats
+        ]
 
         fields = {
             "title": title,
@@ -139,6 +145,7 @@ def export_vault(db: DB, dest: Path) -> dict:
             "directors": directors,
             "actors": actors,
             "collections": tags,
+            "formats": formats,
             "tags": fm_tags,
         }
 
@@ -155,6 +162,8 @@ def export_vault(db: DB, dest: Path) -> dict:
             body.append("## Genre\n\n" + ", ".join(_link("Genres", g) for g in genre_list) + "\n")
         if tags:
             body.append("## Collections\n\n" + ", ".join(_link("Collections", t) for t in tags) + "\n")
+        if formats:
+            body.append("## Formats\n\n" + ", ".join(_link("Formats", f) for f in formats) + "\n")
         if row["notes"]:
             body.append(f"## Notes\n\n{row['notes']}\n")
         if rewatches:
@@ -170,6 +179,8 @@ def export_vault(db: DB, dest: Path) -> dict:
             genres[g].append(note_name)
         for t in tags:
             collections_map[t].append(note_name)
+        for f in formats:
+            formats_map[f].append(note_name)
         index_by_status[row["status"]].append((note_name, row["my_rating"]))
 
     for name, credits in people.items():
@@ -190,6 +201,12 @@ def export_vault(db: DB, dest: Path) -> dict:
         lines += [f"- {_link('Movies', movie)}" for movie in movies]
         (collections_dir / f"{note_name}.md").write_text("\n".join(lines).rstrip() + "\n")
 
+    for name, movies in formats_map.items():
+        note_name = _safe_name(name)
+        lines = [_frontmatter({"tags": ["blockbuster/format"]}), "", "## Titles", ""]
+        lines += [f"- {_link('Movies', movie)}" for movie in movies]
+        (formats_dir / f"{note_name}.md").write_text("\n".join(lines).rstrip() + "\n")
+
     index_lines = ["# Blockbuster", ""]
     for status in ("watched", "watching", "watchlist"):
         items = index_by_status.get(status, [])
@@ -209,6 +226,7 @@ def export_vault(db: DB, dest: Path) -> dict:
         "people": len(people),
         "genres": len(genres),
         "collections": len(collections_map),
+        "formats": len(formats_map),
     }
 
 
@@ -309,6 +327,8 @@ properties:
     displayName: Cast
   note.collections:
     displayName: Collections
+  note.formats:
+    displayName: Formats
 
 views:
   - type: cards
@@ -332,6 +352,7 @@ views:
       - note.imdb_rating
       - note.my_rank
       - note.genres
+      - note.formats
       - note.watched_date
       - note.runtime_minutes
     sort:

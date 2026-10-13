@@ -124,11 +124,11 @@ add a second key for "where to watch" lookups (see below).
 
 ## Everyday keys
 
-`Space` marks movies for bulk actions; `G`, `d`, `w`, and `W` below
+`Space` marks movies for bulk actions; `G`, `O`, `d`, `w`, and `W` below
 apply to every marked movie, or just the selected one if none are
 marked.
 
-Status (`Tab`), type (`y`), tag (`g`), decade (`D`), and the free-text
+Status (`Tab`), type (`y`), tag (`g`), format (`f`), decade (`D`), and the free-text
 filter (`/`, which matches title/genre/director/actors) all combine —
 e.g. `Tab` to watchlist, `g` to a tag, and `D` to a decade narrows to
 just that combination.
@@ -143,12 +143,14 @@ just that combination.
 | `Tab` | cycle status filter (all / watchlist / watched) |
 | `y` | cycle type filter (all / movie / series) |
 | `g` | cycle tag filter (none, then each tag you've used) |
+| `f` | cycle format filter (none, then each format you've used) |
 | `D` | cycle decade filter (none, then each decade you have titles from) |
 | `r` | set/clear a minimum rating filter (your rating, or IMDb's if unwatched) |
 | `t` | set/clear a maximum runtime filter, in minutes |
 | `Space` | mark/unmark selection |
 | `Esc` | clear all marks |
 | `G` | add tag(s) |
+| `O` | add format(s), e.g. Blu-ray, 4K, DVD, Digital |
 | `d` | delete (soft delete, see `u`) |
 | `u` | undo: restore the most recently deleted movie(s) |
 | `w` | mark as watched |
@@ -170,7 +172,7 @@ just that combination.
 Ratings are color-coded (green ≥ 7.5, yellow ≥ 5, red below), using
 your desktop theme's colors when available. A 🎬/📺 icon marks movies
 vs. series, and a ✓ or `-` in Status shows watched vs. watchlist. Wide
-terminals also show a Tags column.
+terminals also show Tags and Format columns.
 
 Inside a movie's detail screen:
 
@@ -234,8 +236,8 @@ blockbuster --export-obsidian ~/notes/BlockbusterVault
 
 Writes a snapshot of your library as an Obsidian-ready markdown vault:
 one note per movie/series (YAML frontmatter with rating, genre, cast,
-tags, watched date, etc., plus its poster), one stub note per
-director/actor, genre, and collection/tag with backlinks to their
+tags, formats, watched date, etc., plus its poster), one stub note per
+director/actor, genre, collection/tag, and format with backlinks to their
 titles, a `Stats.md` mirroring the app's `S` stats screen (totals,
 watch time, average ratings, top genres, by decade), and a
 `Blockbuster.md` index grouped by status — enough for Obsidian's graph
