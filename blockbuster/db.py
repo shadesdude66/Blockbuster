@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS movies (
     title           TEXT NOT NULL,
     year            TEXT,
     media_type      TEXT NOT NULL DEFAULT 'movie',
-    total_seasons   INTEGER,
     runtime_minutes INTEGER,
     genre           TEXT,
     director        TEXT,
@@ -70,8 +69,6 @@ class Movie:
     title: str = ""
     year: str = ""
     media_type: str = "movie"
-    total_seasons: int | None = None
-    current_season: int | None = None
     runtime_minutes: int | None = None
     genre: str = ""
     director: str = ""
@@ -124,12 +121,6 @@ class DB:
         if "media_type" not in cols:
             self.conn.execute("ALTER TABLE movies ADD COLUMN media_type TEXT NOT NULL DEFAULT 'movie'")
             self.conn.commit()
-        if "total_seasons" not in cols:
-            self.conn.execute("ALTER TABLE movies ADD COLUMN total_seasons INTEGER")
-            self.conn.commit()
-        if "current_season" not in cols:
-            self.conn.execute("ALTER TABLE movies ADD COLUMN current_season INTEGER")
-            self.conn.commit()
         self._normalize_poster_paths()
 
     def _normalize_poster_paths(self) -> None:
@@ -157,13 +148,13 @@ class DB:
     def add(self, m: Movie) -> int:
         cur = self.conn.execute(
             """INSERT INTO movies
-               (title, year, media_type, total_seasons, current_season, runtime_minutes,
+               (title, year, media_type, runtime_minutes,
                 genre, director,
                 actors, plot, rated, imdb_rating, imdb_id, poster_path, my_rating, my_rank,
                 status, watched_date, rewatch_count, notes, added_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                m.title, m.year, m.media_type, m.total_seasons, m.current_season,
+                m.title, m.year, m.media_type,
                 m.runtime_minutes, m.genre,
                 m.director, m.actors, m.plot, m.rated, m.imdb_rating, m.imdb_id, m.poster_path,
                 m.my_rating, m.my_rank, m.status, m.watched_date, m.rewatch_count, m.notes,

@@ -13,10 +13,9 @@
 </details>
 
 A keyboard-driven terminal app for tracking movies and TV series you've
-watched: rating, personal rank, runtime (or episode runtime, season
-count, and current season for series), content rating, poster, genre,
-director, cast, watch status, watched date, rewatch count, notes, and
-your own tags/collections.
+watched: rating, personal rank, runtime (episode runtime for series),
+content rating, poster, genre, director, cast, watch status, watched
+date, rewatch count, notes, and your own tags/collections.
 
 No third-party dependencies — pure Python 3 standard library (`curses`,
 `sqlite3`, `urllib`). On terminals at least 64 columns wide, a side
@@ -108,12 +107,12 @@ blockbuster
 - `a` — search OMDb by title (results cover movies and series, labeled
   `[Movie]`/`[Series]`). `Space` marks results, `Enter` adds all
   marked ones, or `Enter` with nothing marked adds just the one you're
-  on. Each addition auto-fills year, runtime (or episode runtime and
-  season count), genre, director, cast, plot, IMDb rating, and poster.
+  on. Each addition auto-fills year, runtime (or episode runtime for
+  series), genre, director, cast, plot, IMDb rating, and poster.
   "Load more results" fetches the next page past 10 matches, keeping
   your marks.
 - `m` — add a movie or series manually (type, title, year,
-  runtime/seasons, genre, director), no internet needed.
+  runtime, genre, director), no internet needed.
 
 Online search needs a free OMDb API key: get one at
 https://www.omdbapi.com/apikey.aspx (activate via email), then press
@@ -186,7 +185,6 @@ Inside a movie's detail screen:
 | `c` | +1 rewatch count (also logs today's date) |
 | `v` | view rewatch history (every logged date) |
 | `o` | where to watch: streaming/rent/buy sources, plus a trailer link (needs a free TMDb API key) |
-| `N` | (series only) advance to the next season |
 | `e` | edit notes |
 | `E` | edit every field, grouped into sections (Title / Status & Ratings / Details / Text); changed fields marked `*`; `q` saves, `Esc` discards (confirms if changed) |
 | `p` | view the poster fullscreen |

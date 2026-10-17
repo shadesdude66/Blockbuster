@@ -68,7 +68,6 @@ HELP_SECTIONS = [
         ("c", "+1 rewatch count"),
         ("v", "view rewatch history"),
         ("o", "where to watch + trailer (needs TMDb key)"),
-        ("N", "advance season (series)"),
         ("e", "edit notes"),
         ("E", "edit all fields at once"),
         ("p", "view poster fullscreen"),
@@ -656,7 +655,6 @@ def add_via_search(stdscr, db: DB) -> list[int]:
             title=details["title"] or item["title"],
             year=details["year"],
             media_type=details["media_type"],
-            total_seasons=details["total_seasons"],
             runtime_minutes=details["runtime_minutes"],
             genre=details["genre"],
             director=details["director"],
@@ -694,10 +692,6 @@ def add_manually(stdscr, db: DB) -> int | None:
     ).fetchone()
     if existing and not confirm(stdscr, f"'{title}' ({year or '?'}) is already in your library - add anyway?"):
         return None
-    total_seasons = None
-    if media_type == "series":
-        seasons_str = prompt(stdscr, "Total seasons (optional)") or ""
-        total_seasons = int(seasons_str) if seasons_str.strip().isdigit() else None
     runtime_label = "Episode runtime in minutes (optional)" if media_type == "series" else "Runtime in minutes (optional)"
     runtime_str = prompt(stdscr, runtime_label) or ""
     runtime_minutes = int(runtime_str) if runtime_str.strip().isdigit() else None
@@ -708,7 +702,6 @@ def add_manually(stdscr, db: DB) -> int | None:
         title=title,
         year=year,
         media_type=media_type,
-        total_seasons=total_seasons,
         runtime_minutes=runtime_minutes,
         genre=genre,
         director=director,
@@ -749,8 +742,6 @@ EDIT_FORM_FIELDS = [
     ("watched_date", "Watched date (YYYY-MM-DD)", "date"),
     ("rewatch_count", "Rewatch count", "int0"),
     ("runtime_minutes", "Runtime (min)", "int"),
-    ("total_seasons", "Total seasons", "int"),
-    ("current_season", "Currently on season", "int"),
     ("rated", "Rated", "text"),
     ("genre", "Genre", "text"),
     ("director", "Director", "text"),
@@ -999,15 +990,6 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                 ("My rating:", my_rating, row["my_rating"]),
                 ("IMDb rating:", imdb_rating, row["imdb_rating"]),
             ]
-            if is_series:
-                lines.append(("Seasons:", row["total_seasons"] if row["total_seasons"] else "-", None))
-                if row["current_season"]:
-                    progress = f"Season {row['current_season']}"
-                    if row["total_seasons"]:
-                        progress += f" of {row['total_seasons']}"
-                else:
-                    progress = "not started"
-                lines.append(("Watching:", progress, None))
             lines += [
                 (runtime_label, f"{row['runtime_minutes']} min" if row["runtime_minutes"] else "-", None),
                 ("Rated:", row["rated"] or "-", None),
@@ -1053,8 +1035,6 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                         y += 1
 
             footer = "r rating  n rank  M rated  w watched  t today  c +rewatch  v history  o watch  "
-            if is_series:
-                footer += "N +season  "
             footer += "e notes  E edit all  p poster  u refresh poster  x delete  q back"
             stdscr.addstr(h - 1, 0, footer[: w - 1], dim_attr())
             stdscr.refresh()
@@ -1150,12 +1130,6 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                     lines.append("")
                     lines.append("Press any key to close.")
                     show_text_screen(stdscr, "\n".join(lines))
-            elif ch == ord("N") and is_series:
-                season = (row["current_season"] or 0) + 1
-                if row["total_seasons"] and season > row["total_seasons"]:
-                    flash(stdscr, f"Already on the last season ({row['total_seasons']}).")
-                else:
-                    db.update(movie_id, current_season=season)
             elif ch == ord("e"):
                 val = prompt(stdscr, "Notes", row["notes"] or "")
                 if val is not None:
@@ -1806,7 +1780,7 @@ def stats_screen(stdscr, db: DB) -> None:
 # -------------------------------------------------------------- export --
 
 EXPORT_FIELDS = [
-    "id", "title", "year", "media_type", "total_seasons", "current_season", "rated", "genre",
+    "id", "title", "year", "media_type", "rated", "genre",
     "director", "actors", "plot", "runtime_minutes", "imdb_rating", "my_rating", "my_rank",
     "status", "watched_date", "rewatch_count", "notes", "tags", "formats", "added_at",
 ]
@@ -2015,8 +1989,6 @@ def import_movies(stdscr, db: DB) -> None:
             title=title,
             year=year,
             media_type=media_type,
-            total_seasons=_row_int(row, "total_seasons"),
-            current_season=_row_int(row, "current_season"),
             runtime_minutes=_row_int(row, "runtime_minutes"),
             genre=(row.get("genre") or ""),
             director=(row.get("director") or ""),

@@ -136,8 +136,6 @@ def export_vault(db: DB, dest: Path) -> dict:
             "imdb_rating": row["imdb_rating"],
             "rated": row["rated"] or None,
             "runtime_minutes": row["runtime_minutes"],
-            "total_seasons": row["total_seasons"],
-            "current_season": row["current_season"],
             "watched_date": row["watched_date"],
             "rewatch_count": row["rewatch_count"],
             "poster": f"[[{poster_link}]]" if poster_link else None,
@@ -313,8 +311,6 @@ properties:
     displayName: Rated
   note.runtime_minutes:
     displayName: Runtime (min)
-  note.total_seasons:
-    displayName: Seasons
   note.watched_date:
     displayName: Watched
   note.rewatch_count:
@@ -385,7 +381,6 @@ views:
       - note.imdb_rating
       - note.genres
       - note.runtime_minutes
-      - note.total_seasons
     sort:
       - property: note.imdb_rating
         direction: DESC
@@ -414,7 +409,6 @@ views:
       - file.name
       - note.status
       - note.my_rating
-      - note.total_seasons
       - note.watched_date
     sort:
       - property: file.name

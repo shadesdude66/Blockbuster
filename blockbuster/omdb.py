@@ -111,13 +111,10 @@ def get_by_id(imdb_id: str) -> dict:
         rated = "Not Rated"
     raw_type = data.get("Type", "movie")
     media_type = "series" if raw_type in ("series", "episode") else "movie"
-    seasons_raw = data.get("totalSeasons", "")
-    total_seasons = int(seasons_raw) if seasons_raw and seasons_raw != "N/A" and seasons_raw.isdigit() else None
     return {
         "title": data.get("Title", ""),
         "year": data.get("Year", ""),
         "media_type": media_type,
-        "total_seasons": total_seasons,
         "runtime_minutes": runtime_minutes,
         "genre": data.get("Genre", ""),
         "director": data.get("Director", ""),
