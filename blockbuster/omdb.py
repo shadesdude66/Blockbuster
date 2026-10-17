@@ -36,12 +36,14 @@ def _request(params: dict) -> dict:
     return data
 
 
-def search(title: str, page: int = 1, media_type: str | None = None) -> tuple[list[dict], int]:
+def search(title: str, page: int = 1, media_type: str | None = None,
+           year: str | None = None) -> tuple[list[dict], int]:
     """Search by title, return (results, total_results_available).
 
     OMDb paginates at 10 results per page; pass a higher `page` to fetch
     more of `total_results_available` results. `media_type`, if given,
     restricts to "movie" or "series"; left unset, results include both.
+    `year`, if given, restricts to titles released that year.
 
     OMDb's fuzzy `s=` search rejects very short/common titles (e.g. "Up",
     "It") with "Too many results" even though an exact match exists, so on
@@ -50,6 +52,8 @@ def search(title: str, page: int = 1, media_type: str | None = None) -> tuple[li
     params = {"s": title, "page": page}
     if media_type:
         params["type"] = media_type
+    if year:
+        params["y"] = year
     try:
         data = _request(params)
     except OmdbError:
@@ -93,7 +97,33 @@ def _exact_match_fallback(title: str, media_type: str | None) -> tuple[list[dict
 
 def get_by_id(imdb_id: str) -> dict:
     """Fetch full details for a single title by IMDb id."""
-    data = _request({"i": imdb_id, "plot": "full"})
+    return _parse_details(_request({"i": imdb_id, "plot": "full"}))
+
+
+def lookup(title: str, year: str | None = None) -> dict | None:
+    """Fetch full details for OMDb's best exact-title match (optionally
+    for a given release year), or None if OMDb finds no such title.
+    Other errors (network, bad key, daily limit) still raise OmdbError."""
+    params = {"t": title, "plot": "full"}
+    if year:
+        params["y"] = year
+    try:
+        data = _request(params)
+    except OmdbError as e:
+        if is_not_found(e):
+            return None
+        raise
+    return _parse_details(data)
+
+
+def is_not_found(error: OmdbError) -> bool:
+    """True for OMDb's "no such title" errors ("Movie not found!", "Too
+    many results."), as opposed to network/key/rate-limit failures."""
+    msg = str(error).lower()
+    return "not found" in msg or "too many results" in msg
+
+
+def _parse_details(data: dict) -> dict:
     runtime_raw = data.get("Runtime", "")
     runtime_minutes = None
     if runtime_raw and runtime_raw != "N/A":

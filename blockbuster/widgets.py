@@ -50,6 +50,7 @@ HELP_SECTIONS = [
         ("B", "back up database now"),
         ("X", "export to CSV/JSON/Obsidian vault"),
         ("I", "import from CSV/JSON/Letterboxd"),
+        ("U", "fill in missing info from OMDb"),
     ]),
     ("MOVIE DETAIL SCREEN", [
         ("r", "set your rating (0-10)"),
@@ -64,6 +65,7 @@ HELP_SECTIONS = [
         ("E", "edit all fields at once"),
         ("p", "view poster fullscreen"),
         ("u", "refresh poster from OMDb"),
+        ("f", "fill in missing info from OMDb"),
         ("x", "delete this movie"),
     ]),
     ("OTHER", [

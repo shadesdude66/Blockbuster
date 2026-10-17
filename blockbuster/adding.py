@@ -1,8 +1,9 @@
-"""Adding titles: OMDb search and manual entry."""
+"""Adding titles (OMDb search, manual entry) and filling in missing OMDb
+info on titles already in the library."""
 
 import curses
 
-from . import omdb
+from . import config, metadata, omdb
 from .db import DB, Movie
 from .widgets import (
     accent_attr,
@@ -13,6 +14,7 @@ from .widgets import (
     flash,
     prompt,
     selected_attr,
+    show_text_screen,
 )
 
 
@@ -180,3 +182,144 @@ def add_manually(stdscr, db: DB) -> int | None:
     movie_id = db.add(m)
     flash(stdscr, f"Added '{title}'.")
     return movie_id
+
+
+# --------------------------------------------------------- fill in info --
+
+FIELD_LABELS = {
+    "year": "year", "runtime_minutes": "runtime", "genre": "genre",
+    "director": "director", "actors": "cast", "plot": "plot",
+    "rated": "content rating", "imdb_rating": "IMDb rating",
+    "imdb_id": "IMDb id", "poster_path": "poster",
+}
+FILL_SUMMARY_MAX_LISTED = 25
+
+
+def require_api_key(stdscr) -> bool:
+    if config.get_api_key():
+        return True
+    flash(stdscr, "Needs an OMDb API key - press 'K' in the list screen to set one.")
+    return False
+
+
+def _fill_result_message(filled: list[str], clash_title: str | None) -> str:
+    if clash_title:
+        msg = f"Already in your library as '{clash_title}' - IMDb id not linked."
+        if filled:
+            msg += " Filled in: " + ", ".join(FIELD_LABELS.get(f, f) for f in filled) + "."
+        return msg
+    if not filled:
+        return "Nothing missing - every field OMDb has is already filled in."
+    return "Filled in " + ", ".join(FIELD_LABELS.get(f, f) for f in filled) + "."
+
+
+def fill_info_for_title(stdscr, db: DB, movie_id: int) -> None:
+    """Fill in one title's empty fields from OMDb. A title already linked
+    to an IMDb id is fetched directly; otherwise the user picks the right
+    match from an OMDb search (same-year results listed first), refining
+    the search text if nothing turns up."""
+    if not require_api_key(stdscr):
+        return
+    row = db.get(movie_id)
+    try:
+        if row["imdb_id"]:
+            flash(stdscr, "Fetching info from OMDb...")
+            details = omdb.get_by_id(row["imdb_id"])
+        else:
+            year = (row["year"] or "").strip()[:4]
+            query = row["title"]
+            while True:
+                flash(stdscr, f"Searching OMDb for '{query}'...")
+                try:
+                    results, _ = omdb.search(query)
+                except omdb.OmdbError as e:
+                    if not omdb.is_not_found(e):
+                        raise
+                    results = []
+                if results:
+                    break
+                query = prompt(stdscr, "No OMDb results - search for", query)
+                if not query:
+                    return
+            results.sort(key=lambda r: r["year"][:4] != year)
+            choice = choose_from_list(
+                stdscr, f"Pick the OMDb match for '{row['title']}' ({year or '?'}):", results,
+                lambda r: f"{r['title']} ({r['year']}) [{r['media_type'].capitalize()}]",
+            )
+            if not choice:
+                return
+            flash(stdscr, f"Fetching details for '{choice['title']}'...")
+            details = omdb.get_by_id(choice["imdb_id"])
+    except omdb.OmdbError as e:
+        flash(stdscr, f"OMDb error: {e}")
+        return
+    filled, clash_title = metadata.apply_details(db, row, details)
+    flash(stdscr, _fill_result_message(filled, clash_title))
+
+
+def _esc_pressed(stdscr) -> bool:
+    """Non-blocking check for Esc; any other pending key is put back."""
+    stdscr.nodelay(True)
+    try:
+        ch = stdscr.getch()
+    finally:
+        stdscr.nodelay(False)
+    if ch not in (-1, 27):
+        curses.ungetch(ch)
+    return ch == 27
+
+
+def fill_missing_info(stdscr, db: DB, movie_ids: list[int]) -> None:
+    """Fill in empty fields from OMDb for many titles at once, matching
+    each automatically by title and year (see metadata.find_match). Titles
+    without a confident match are skipped and listed at the end, to fix
+    one at a time with 'f' on their detail screen. Esc stops early; a
+    later run picks up where this one left off, since filled-in titles no
+    longer count as missing info."""
+    if not movie_ids or not require_api_key(stdscr):
+        return
+    total = len(movie_ids)
+    updated = 0
+    unmatched: list[str] = []
+    clashes: list[str] = []
+    stopped = ""
+    for n, movie_id in enumerate(movie_ids, 1):
+        if _esc_pressed(stdscr):
+            stopped = "Stopped early (Esc)."
+            break
+        row = db.get(movie_id)
+        label = f"{row['title']} ({row['year'] or '?'})"
+        stdscr.erase()
+        h, w = stdscr.getmaxyx()
+        stdscr.addstr(0, 0, f"Filling in info from OMDb: {n} of {total}"[: w - 1], accent_attr() | curses.A_BOLD)
+        stdscr.addstr(2, 2, label[: w - 3])
+        stdscr.addstr(h - 1, 0, "Esc stop"[: w - 1], dim_attr())
+        stdscr.refresh()
+        try:
+            details = metadata.find_match(row)
+        except omdb.OmdbError as e:
+            stopped = f"Stopped early - OMDb error: {e}"
+            break
+        if not details:
+            unmatched.append(label)
+            continue
+        filled, clash_title = metadata.apply_details(db, row, details)
+        if clash_title:
+            clashes.append(f"{label} - already in your library as '{clash_title}'")
+        if filled:
+            updated += 1
+
+    lines = [f"Filled in info for {updated} of {total} title(s)."]
+    if stopped:
+        lines += ["", stopped, "Run it again later to pick up the rest."]
+    for heading, items in (
+        ("No confident match - open each one and press 'f' to pick the right title:", unmatched),
+        ("Duplicates (IMDb id not linked):", clashes),
+    ):
+        if items:
+            lines += ["", heading]
+            lines += [f"  {item}" for item in items[:FILL_SUMMARY_MAX_LISTED]]
+            if len(items) > FILL_SUMMARY_MAX_LISTED:
+                lines.append(f"  ...and {len(items) - FILL_SUMMARY_MAX_LISTED} more")
+    lines += ["", "Press any key."]
+    show_text_screen(stdscr, "\n".join(lines))

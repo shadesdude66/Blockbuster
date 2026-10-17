@@ -6,6 +6,7 @@ import textwrap
 from datetime import date
 
 from . import config, omdb, tmdb
+from .adding import fill_info_for_title
 from .db import DB
 from .widgets import (
     PREVIEW_MIN_TERM_WIDTH,
@@ -350,7 +351,7 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                         y += 1
 
             footer = "r rating  n rank  M rated  w watched  t today  c +rewatch  v history  o watch  "
-            footer += "e notes  E edit all  p poster  u refresh poster  x delete  q back"
+            footer += "e notes  E edit all  p poster  u refresh poster  f fill info  x delete  q back"
             stdscr.addstr(h - 1, 0, footer[: w - 1], dim_attr())
             stdscr.refresh()
 
@@ -471,6 +472,10 @@ def movie_detail(stdscr, db: DB, movie_id: int) -> None:
                             flash(stdscr, "Poster updated from OMDb.")
                         else:
                             flash(stdscr, "OMDb has no poster for this title.")
+            elif ch == ord("f"):
+                clear_kitty_images()
+                last_poster_key = "unset"
+                fill_info_for_title(stdscr, db, movie_id)
             elif ch == ord("x"):
                 if confirm(stdscr, f"Delete '{row['title']}'?"):
                     db.delete(movie_id)

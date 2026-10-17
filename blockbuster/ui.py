@@ -8,8 +8,9 @@ import subprocess
 from datetime import date
 
 from . import __version__, config
-from .adding import add_manually, add_via_search
+from .adding import add_manually, add_via_search, fill_missing_info, require_api_key
 from .db import DB, SORT_FIELDS
+from .metadata import missing_info_ids
 from .detail import edit_movie_form, movie_detail
 from .import_export import export_movies, import_movies
 from .screens import (
@@ -334,7 +335,7 @@ class App:
         footer = (
             "a add  m manual  Enter details  E edit  / filter  s sort  Tab status  y type  g tag  f format  "
             "Space mark  G add tag(s)  O add format(s)  d delete  u undo  w watched  W watchlist  "
-            "R random  P poster wall  T trash  S stats  C collections  B backup  X export  I import  K api-key  ? help  q quit"
+            "R random  P poster wall  T trash  S stats  C collections  B backup  X export  I import  U fill info  K api-key  ? help  q quit"
         )
         stdscr.addstr(h - 1, 0, footer[: w - 1], dim_attr())
 
@@ -534,6 +535,22 @@ class App:
                     for mid in target_ids:
                         self.db.update(mid, status="watchlist")
                     flash(stdscr, f"Marked {len(target_ids)} movie(s) as watchlist.")
+                    self.selected_ids.clear()
+            elif ch == ord("U"):
+                clear_kitty_images()
+                self.last_preview_key = "unset"
+                if not require_api_key(stdscr):
+                    target_ids = []
+                elif self.selected_ids:
+                    target_ids = list(self.selected_ids)
+                else:
+                    target_ids = missing_info_ids(self.db)
+                    if not target_ids:
+                        flash(stdscr, "Every title already has its OMDb info.")
+                    elif not confirm(stdscr, f"Fill in missing info from OMDb for {len(target_ids)} title(s)?"):
+                        target_ids = []
+                if target_ids:
+                    fill_missing_info(stdscr, self.db, target_ids)
                     self.selected_ids.clear()
             elif ch == ord("B"):
                 dest = config.backup_now()

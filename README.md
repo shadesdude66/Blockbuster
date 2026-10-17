@@ -152,6 +152,7 @@ just that combination.
 | `B` | back up the database now (timestamped copy) |
 | `X` | export the collection to CSV, JSON, or an Obsidian vault |
 | `I` | import from a CSV/JSON file (same format as `X`'s export, or a raw Letterboxd export - see below); skips anything already present, matched by IMDb id or title+year |
+| `U` | fill in missing info (genre, director, cast, plot, poster, ...) from OMDb for marked titles, or every title missing it if none are marked; never overwrites existing values |
 | `?` | full help screen |
 | `q` | back / quit |
 
@@ -176,6 +177,7 @@ Inside a movie's detail screen:
 | `E` | edit every field, grouped into sections (Title / Status & Ratings / Details / Text); changed fields marked `*`; `q` saves, `Esc` discards (confirms if changed) |
 | `p` | view the poster fullscreen |
 | `u` | re-fetch the poster from OMDb (needs an IMDb id, so not for manually-added titles) |
+| `f` | fill in this title's missing info from OMDb, picking the match from a search if it isn't linked to IMDb yet (e.g. manual adds and Letterboxd imports) |
 | `x` | delete this movie |
 
 "Where to watch" (`o`) needs its own free API key from
@@ -207,8 +209,17 @@ column headers, no need to reformat them first. Star ratings (0.5–5)
 are scaled to this app's 0–10 scale; a `diary.csv` row marked as a
 rewatch logs a rewatch on the existing title (viewable with `v`)
 instead of being skipped as a duplicate. Letterboxd doesn't export
-genre, director, cast, or posters — re-fetch those later by deleting
-and re-adding a title via OMDb search (`a`) if you want them filled in.
+genre, director, cast, plot, or posters, so after the import the app
+offers to fill those in from OMDb (one request per title; the free key
+allows 1,000 a day). You can also run it any time with `U`.
+
+Filling in never overwrites anything: your ratings, watch dates, notes,
+and any field that already has a value are left alone. Each title is
+matched automatically by title and year; ones without a confident match
+(e.g. two films with the same name and year) are skipped and listed at
+the end. Open each of those and press `f` to pick the right OMDb match
+yourself. If the run stops early (`Esc`, or OMDb's daily limit), press
+`U` again later and it picks up where it left off.
 
 ### Obsidian vault export
 
@@ -261,7 +272,8 @@ blockbuster/
   theme.py      reads the active Omarchy theme's colors, if present
   ui.py         curses TUI: main list screen and command-line entry point
   widgets.py    shared curses helpers: theme colors, prompts, help/poster screens
-  adding.py     adding titles (OMDb search, manual entry)
+  adding.py     adding titles (OMDb search, manual entry), fill-in-info screens
+  metadata.py   matching titles to OMDb and filling in their empty fields
   detail.py     movie detail screen and edit-all-fields form
   screens.py    stats, collections, trash, poster wall, heatmap, and other screens
   import_export.py  CSV/JSON/Obsidian export, CSV/JSON/Letterboxd import

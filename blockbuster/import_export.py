@@ -6,8 +6,9 @@ from datetime import datetime
 from pathlib import Path
 
 from . import config
+from .adding import fill_missing_info
 from .db import DB, Movie
-from .widgets import choose_from_list, flash, prompt
+from .widgets import choose_from_list, confirm, flash, prompt
 
 
 # -------------------------------------------------------------- export --
@@ -175,7 +176,8 @@ def import_movies(stdscr, db: DB) -> None:
     if not rows:
         flash(stdscr, "No rows found to import.")
         return
-    if _is_letterboxd_export(rows):
+    is_letterboxd = _is_letterboxd_export(rows)
+    if is_letterboxd:
         rows = _normalize_letterboxd_rows(rows, path)
         flash(stdscr, f"Detected a Letterboxd export ({len(rows)} rows).")
 
@@ -189,7 +191,8 @@ def import_movies(stdscr, db: DB) -> None:
         for r in db.conn.execute("SELECT title, year FROM movies")
     }
 
-    imported = skipped = 0
+    imported_ids: list[int] = []
+    skipped = 0
     for row in rows:
         title = (row.get("title") or "").strip()
         if not title:
@@ -247,6 +250,13 @@ def import_movies(stdscr, db: DB) -> None:
         if imdb_id:
             existing_imdb_ids.add(imdb_id)
         existing_title_years.add((title.lower(), year))
-        imported += 1
+        imported_ids.append(movie_id)
 
-    flash(stdscr, f"Imported {imported} title(s), skipped {skipped} duplicate/invalid row(s).")
+    flash(stdscr, f"Imported {len(imported_ids)} title(s), skipped {skipped} duplicate/invalid row(s).")
+    # Letterboxd exports carry no genre/director/cast/plot/poster, so
+    # offer to fetch them now (one OMDb request per title).
+    if is_letterboxd and imported_ids:
+        if not config.get_api_key():
+            flash(stdscr, "Set an OMDb key with 'K', then press 'U' to fill in genre, cast, and posters.")
+        elif confirm(stdscr, f"Fill in genre, director, cast, and posters from OMDb for {len(imported_ids)} title(s)?"):
+            fill_missing_info(stdscr, db, imported_ids)
