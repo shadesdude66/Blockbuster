@@ -27,42 +27,28 @@ columns; press `p` for a fullscreen poster instead, falling back to
 
 ## Install
 
-Requires only Python 3.10+ (for `curses` and `sqlite3`, both in the
-standard library) — no `pip install` needed. Works on macOS and Linux;
+Requires only Python 3.10+ — no third-party dependencies (`curses`
+and `sqlite3` are in the standard library). Works on macOS and Linux;
 `curses` isn't available on Windows.
+
+Install it as a `blockbuster` command with [pipx](https://pipx.pypa.io)
+(or `uv tool install` in place of `pipx install`):
+
+```
+pipx install git+https://github.com/shadesdude66/Blockbuster.git
+```
+
+Update later with `pipx upgrade blockbuster`. Make sure `~/.local/bin`
+is on your `PATH` (`pipx ensurepath` sets that up).
+
+To try it without installing, run it straight from a clone (this only
+works from inside the `Blockbuster` directory):
 
 ```
 git clone https://github.com/shadesdude66/Blockbuster.git
 cd Blockbuster
 python3 -m blockbuster
 ```
-
-That's enough to run it — but `python3 -m blockbuster` only works from
-inside the `Blockbuster` directory (that's how Python finds the
-package); running it from elsewhere fails with
-`No module named 'blockbuster'`. For a `blockbuster` command you can
-run from anywhere:
-
-```
-mkdir -p ~/.local/bin
-cat > ~/.local/bin/blockbuster <<EOF
-#!/usr/bin/env python3
-import sys
-from pathlib import Path
-
-sys.path.insert(0, "$(pwd)")
-
-from blockbuster.ui import main
-
-if __name__ == "__main__":
-    main()
-EOF
-chmod +x ~/.local/bin/blockbuster
-```
-
-Run this from inside the `Blockbuster` directory — the unquoted
-heredoc bakes in `$(pwd)` as the real clone path, so there's nothing to
-edit by hand. Make sure `~/.local/bin` is on your `PATH`.
 
 Optionally, add it to your app launcher with a `.desktop` file (Linux):
 
@@ -84,7 +70,8 @@ gets you live poster images, per the note above.)
 
 ### Shell completion
 
-Tab-completion for `blockbuster`'s `--help`/`--version` flags:
+Tab-completion for `blockbuster`'s flags (`--help`, `--version`, and
+`--export-obsidian`, which completes a directory):
 
 ```
 # bash - add to ~/.bashrc
@@ -272,7 +259,14 @@ blockbuster/
   tmdb.py       TMDb API client (watch providers, trailers)
   recommend.py  local genre/director/cast similarity scoring
   theme.py      reads the active Omarchy theme's colors, if present
-  ui.py         curses TUI
+  ui.py         curses TUI: main list screen and command-line entry point
+  widgets.py    shared curses helpers: theme colors, prompts, help/poster screens
+  adding.py     adding titles (OMDb search, manual entry)
+  detail.py     movie detail screen and edit-all-fields form
+  screens.py    stats, collections, trash, poster wall, heatmap, and other screens
+  import_export.py  CSV/JSON/Obsidian export, CSV/JSON/Letterboxd import
+  obsidian_export.py  Obsidian vault writer
   __main__.py   entry point (python3 -m blockbuster)
 completions/    bash/zsh completion scripts for the blockbuster command
+pyproject.toml  packaging metadata (pipx install / the blockbuster command)
 ```

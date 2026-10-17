@@ -6,5 +6,6 @@
 #   fpath=(~/.zsh/completions $fpath)   # add to ~/.zshrc before compinit
 
 _arguments \
-  '--help[show help message and exit]' \
-  '--version[show version and exit]'
+  '(- *)'{-h,--help}'[show help message and exit]' \
+  '(- *)--version[show version and exit]' \
+  '--export-obsidian=[export the library as an Obsidian vault to DIR and exit]:directory:_files -/'

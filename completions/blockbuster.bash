@@ -3,9 +3,14 @@
 #   source /path/to/Blockbuster/completions/blockbuster.bash
 
 _blockbuster_completions() {
-    local cur
+    local cur prev
     cur="${COMP_WORDS[COMP_CWORD]}"
-    COMPREPLY=($(compgen -W "--help --version" -- "$cur"))
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    if [[ "$prev" == "--export-obsidian" ]]; then
+        COMPREPLY=($(compgen -d -- "$cur"))
+        return
+    fi
+    COMPREPLY=($(compgen -W "-h --help --version --export-obsidian" -- "$cur"))
 }
 
-complete -F _blockbuster_completions blockbuster
+complete -o filenames -F _blockbuster_completions blockbuster
