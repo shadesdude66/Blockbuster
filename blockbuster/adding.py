@@ -257,7 +257,7 @@ def fill_info_for_title(stdscr, db: DB, movie_id: int) -> None:
     flash(stdscr, _fill_result_message(filled, clash_title))
 
 
-def _esc_pressed(stdscr) -> bool:
+def esc_pressed(stdscr) -> bool:
     """Non-blocking check for Esc; any other pending key is put back."""
     stdscr.nodelay(True)
     try:
@@ -284,7 +284,7 @@ def fill_missing_info(stdscr, db: DB, movie_ids: list[int]) -> None:
     clashes: list[str] = []
     stopped = ""
     for n, movie_id in enumerate(movie_ids, 1):
-        if _esc_pressed(stdscr):
+        if esc_pressed(stdscr):
             stopped = "Stopped early (Esc)."
             break
         row = db.get(movie_id)

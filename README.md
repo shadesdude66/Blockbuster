@@ -152,6 +152,7 @@ just that combination.
 | `B` | back up the database now (timestamped copy) |
 | `X` | export the collection to CSV, JSON, or an Obsidian vault |
 | `I` | import from a CSV/JSON file (same format as `X`'s export, or a raw Letterboxd export - see below); skips anything already present, matched by IMDb id or title+year |
+| `L` | work through a list of titles from a CSV or Excel (`.xlsx`) file: add every title not already in your library from OMDb, or add a tag or format to every listed title (see below) |
 | `U` | fill in missing info (genre, director, cast, plot, poster, ...) from OMDb for marked titles, or every title missing it if none are marked; never overwrites existing values |
 | `?` | full help screen |
 | `q` | back / quit |
@@ -221,6 +222,36 @@ the end. Open each of those and press `f` to pick the right OMDb match
 yourself. If the run stops early (`Esc`, or OMDb's daily limit), press
 `U` again later and it picks up where it left off.
 
+### Adding, tagging, or formatting titles from a list (CSV or Excel)
+
+Press `L` and give it the path to a `.csv` or `.xlsx` file listing
+titles, then pick what to do with them:
+
+- **Add missing titles from OMDb** (needs an OMDb key): each title
+  already in your library is left alone; the rest are looked up on OMDb
+  and added with full details and posters, as watchlist or watched (you
+  pick before it starts).
+- **Add tag(s)** or **Add format(s) to every listed title**: type one or
+  more (comma-separated, e.g. `4K, Owned`) and they're added to every
+  listed title in your library, on top of any it already has. If some
+  listed titles aren't in your library yet, it offers to add them from
+  OMDb first so they get the tag/format too. A title without a year
+  that matches more than one title in your library (e.g. both *Dune*s)
+  is skipped and listed; add a Year column, or use `G`/`O` on the right one.
+
+The file just needs a column of titles. With a header row, the column
+named Title, Name, Movie, or Film is used, plus an optional Year column
+to tell remakes apart. Without a header, the first column is the title
+and a second column of years is used if present. `Heat (1995)` written
+in the title cell works too.
+
+OMDb lookups match titles automatically, the same way as `U`; any without a
+confident OMDb match are listed at the end to add by hand with `a`.
+Titles you'd deleted are restored from trash rather than added twice.
+`Esc` stops early; running it again skips everything already added.
+Old binary `.xls` files aren't supported, so save those as `.xlsx` or
+`.csv` first.
+
 ### Obsidian vault export
 
 Press `X` in the app and pick "Obsidian vault", or run it from the
@@ -277,6 +308,7 @@ blockbuster/
   detail.py     movie detail screen and edit-all-fields form
   screens.py    stats, collections, trash, poster wall, heatmap, and other screens
   import_export.py  CSV/JSON/Obsidian export, CSV/JSON/Letterboxd import
+  title_list.py  syncing a CSV/Excel list of titles into the library via OMDb
   obsidian_export.py  Obsidian vault writer
   __main__.py   entry point (python3 -m blockbuster)
 completions/    bash/zsh completion scripts for the blockbuster command

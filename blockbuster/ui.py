@@ -13,6 +13,7 @@ from .db import DB, SORT_FIELDS
 from .metadata import missing_info_ids
 from .detail import edit_movie_form, movie_detail
 from .import_export import export_movies, import_movies
+from .title_list import sync_title_list
 from .screens import (
     aging_watchlist_screen,
     collections_screen,
@@ -563,6 +564,10 @@ class App:
                 clear_kitty_images()
                 self.last_preview_key = "unset"
                 import_movies(stdscr, self.db)
+            elif ch == ord("L"):
+                clear_kitty_images()
+                self.last_preview_key = "unset"
+                sync_title_list(stdscr, self.db)
             elif ch == ord("R"):
                 clear_kitty_images()
                 self.last_preview_key = "unset"

@@ -31,7 +31,8 @@ def missing_info_ids(db: DB) -> list[int]:
     return [r["id"] for r in rows]
 
 
-def _norm(title: str) -> str:
+def norm_title(title: str) -> str:
+    """Title folded for loose comparison: case and punctuation ignored."""
     return "".join(ch for ch in title.casefold() if ch.isalnum())
 
 
@@ -40,7 +41,23 @@ def _year(value: str | None) -> str:
     return (value or "").strip()[:4]
 
 
-def find_match(row: sqlite3.Row) -> dict | None:
+def library_index(db: DB) -> dict[str, list[tuple[str, int]]]:
+    """Live titles keyed by norm_title, each with its (start year, id)
+    entries - year "" for a title with no year."""
+    index: dict[str, list[tuple[str, int]]] = {}
+    for r in db.conn.execute("SELECT id, title, year FROM movies WHERE deleted_at IS NULL"):
+        index.setdefault(norm_title(r["title"]), []).append((_year(r["year"]), r["id"]))
+    return index
+
+
+def find_in_library(index: dict[str, list[tuple[str, int]]], title: str, year: str = "") -> list[int]:
+    """Ids of the library_index entries matching a title (and year, if
+    given). A year only rules out entries that have a different year."""
+    entries = index.get(norm_title(title), [])
+    return [movie_id for y, movie_id in entries if not year or not y or y == year]
+
+
+def find_match(row: sqlite3.Row | dict) -> dict | None:
     """Full OMDb details for this title, or None if there's no confident
     automatic match (left for the user to pick by hand).
 
@@ -57,7 +74,7 @@ def find_match(row: sqlite3.Row) -> dict | None:
     if details:
         if year and _year(details["year"]) == year:
             return details
-        if not year and _norm(details["title"]) == _norm(title):
+        if not year and norm_title(details["title"]) == norm_title(title):
             return details
     if not year:
         return None

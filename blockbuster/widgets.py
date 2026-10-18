@@ -50,6 +50,7 @@ HELP_SECTIONS = [
         ("B", "back up database now"),
         ("X", "export to CSV/JSON/Obsidian vault"),
         ("I", "import from CSV/JSON/Letterboxd"),
+        ("L", "add, tag, or format titles from a CSV/Excel list"),
         ("U", "fill in missing info from OMDb"),
     ]),
     ("MOVIE DETAIL SCREEN", [
