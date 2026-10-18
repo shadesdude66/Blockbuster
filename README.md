@@ -268,7 +268,7 @@ director/actor, genre, collection/tag, and format with backlinks to their
 titles, a `Stats.md` mirroring the app's `S` stats screen (totals,
 watch time, average ratings, top genres, by decade), and a
 `watched.md` index grouped by status — enough for Obsidian's graph
-and backlinks to connect everything. `Changelog.md` lists every title
+and backlinks to connect everything. `movielog.md` lists every title
 by the date it was added, with its tags and formats, and
 `Version History.md` lists Blockbuster's releases and what each changed. It's a one-shot export, not a
 live sync; re-run the command to refresh the vault.

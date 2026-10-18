@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Obsidian export: the Base is now `BLOCKBUSTER.base` and the index note
-  is `watched.md`; adds a `Changelog.md` of everything in the library by
+  is `watched.md`; adds a `movielog.md` of everything in the library by
   date added, and this version history
 - `L`: add, tag, or format titles from a CSV/Excel list
 - Fill in missing OMDb info for Letterboxd imports and manual adds

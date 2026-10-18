@@ -3,7 +3,7 @@
 Produces one note per movie/series (with YAML frontmatter for rating,
 genre, director, tags, formats, etc.), plus stub notes per director/actor,
 genre, collection/tag, and format so Obsidian's backlinks and graph view have something
-to connect, a Stats.md mirroring the app's stats screen, a Changelog.md
+to connect, a Stats.md mirroring the app's stats screen, a movielog.md
 of every title by date added, and a Version History.md of app releases.
 This is a one-shot snapshot, not a live sync - re-run it to refresh.
 """
@@ -223,7 +223,7 @@ def export_vault(db: DB, dest: Path) -> dict:
 
     (dest / "Stats.md").write_text(_stats_note(rows, db))
     (dest / "BLOCKBUSTER.base").write_text(_MOVIES_BASE)
-    (dest / "Changelog.md").write_text(_changelog_note(added_by_date))
+    (dest / "movielog.md").write_text(_movielog_note(added_by_date))
     (dest / "Version History.md").write_text(files(__package__).joinpath("CHANGELOG.md").read_text())
 
     return {
@@ -235,10 +235,10 @@ def export_vault(db: DB, dest: Path) -> dict:
     }
 
 
-def _changelog_note(added_by_date: dict[str, list[tuple[str, list[str], list[str]]]]) -> str:
+def _movielog_note(added_by_date: dict[str, list[tuple[str, list[str], list[str]]]]) -> str:
     """Every title in the library, grouped by the date it was added
     (newest first), with its tags and formats."""
-    lines = [_frontmatter({"tags": ["blockbuster/changelog"]}), "", "# Changelog", ""]
+    lines = [_frontmatter({"tags": ["blockbuster/movielog"]}), "", "# Movielog", ""]
     for day in sorted(added_by_date, reverse=True):
         lines.append(f"## {day or 'Unknown date'}\n")
         for note_name, tags, formats in sorted(added_by_date[day]):
