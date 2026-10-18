@@ -267,11 +267,11 @@ tags, formats, watched date, etc., plus its poster), one stub note per
 director/actor, genre, collection/tag, and format with backlinks to their
 titles, a `Stats.md` mirroring the app's `S` stats screen (totals,
 watch time, average ratings, top genres, by decade), and a
-`Blockbuster.md` index grouped by status — enough for Obsidian's graph
+`watched.md` index grouped by status — enough for Obsidian's graph
 and backlinks to connect everything. It's a one-shot export, not a
 live sync; re-run the command to refresh the vault.
 
-It also writes `Movies.base`, an Obsidian Base (requires Obsidian
+It also writes `BLOCKBUSTER.base`, an Obsidian Base (requires Obsidian
 1.9+, where Bases ships as a core plugin) with seven pre-built views:
 six sortable/filterable table views (All, Watched, Watchlist, Top
 Rated, TV Shows, Movies Only) over fields like status, my rating, IMDb

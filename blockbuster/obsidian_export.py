@@ -214,10 +214,10 @@ def export_vault(db: DB, dest: Path) -> dict:
         index_lines.append(f"## {status.capitalize()} ({len(items)})\n")
         index_lines += [f"- {_link('Movies', name)}" for name, _ in items]
         index_lines.append("")
-    (dest / "Blockbuster.md").write_text("\n".join(index_lines).rstrip() + "\n")
+    (dest / "watched.md").write_text("\n".join(index_lines).rstrip() + "\n")
 
     (dest / "Stats.md").write_text(_stats_note(rows, db))
-    (dest / "Movies.base").write_text(_MOVIES_BASE)
+    (dest / "BLOCKBUSTER.base").write_text(_MOVIES_BASE)
 
     return {
         "movies": len(rows),
