@@ -25,5 +25,8 @@ blockbuster = "blockbuster.ui:main"
 [tool.setuptools]
 packages = ["blockbuster"]
 
+[tool.setuptools.package-data]
+blockbuster = ["CHANGELOG.md"]
+
 [tool.setuptools.dynamic]
 version = { attr = "blockbuster.__version__" }

@@ -3,13 +3,15 @@
 Produces one note per movie/series (with YAML frontmatter for rating,
 genre, director, tags, formats, etc.), plus stub notes per director/actor,
 genre, collection/tag, and format so Obsidian's backlinks and graph view have something
-to connect, and a Stats.md mirroring the app's stats screen. This is a
-one-shot snapshot, not a live sync - re-run it to refresh.
+to connect, a Stats.md mirroring the app's stats screen, a Changelog.md
+of every title by date added, and a Version History.md of app releases.
+This is a one-shot snapshot, not a live sync - re-run it to refresh.
 """
 
 import re
 import shutil
 from collections import Counter, defaultdict
+from importlib.resources import files
 from pathlib import Path
 
 from . import config
@@ -95,6 +97,8 @@ def export_vault(db: DB, dest: Path) -> dict:
     collections_map: dict[str, list[str]] = defaultdict(list)
     formats_map: dict[str, list[str]] = defaultdict(list)
     index_by_status: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    # date added -> list of (movie note name, tags, formats)
+    added_by_date: dict[str, list[tuple[str, list[str], list[str]]]] = defaultdict(list)
 
     for row in rows:
         title = row["title"] or "Untitled"
@@ -180,6 +184,7 @@ def export_vault(db: DB, dest: Path) -> dict:
         for f in formats:
             formats_map[f].append(note_name)
         index_by_status[row["status"]].append((note_name, row["my_rating"]))
+        added_by_date[(row["added_at"] or "")[:10]].append((note_name, tags, formats))
 
     for name, credits in people.items():
         note_name = _safe_name(name)
@@ -218,6 +223,8 @@ def export_vault(db: DB, dest: Path) -> dict:
 
     (dest / "Stats.md").write_text(_stats_note(rows, db))
     (dest / "BLOCKBUSTER.base").write_text(_MOVIES_BASE)
+    (dest / "Changelog.md").write_text(_changelog_note(added_by_date))
+    (dest / "Version History.md").write_text(files(__package__).joinpath("CHANGELOG.md").read_text())
 
     return {
         "movies": len(rows),
@@ -226,6 +233,19 @@ def export_vault(db: DB, dest: Path) -> dict:
         "collections": len(collections_map),
         "formats": len(formats_map),
     }
+
+
+def _changelog_note(added_by_date: dict[str, list[tuple[str, list[str], list[str]]]]) -> str:
+    """Every title in the library, grouped by the date it was added
+    (newest first), with its tags and formats."""
+    lines = [_frontmatter({"tags": ["blockbuster/changelog"]}), "", "# Changelog", ""]
+    for day in sorted(added_by_date, reverse=True):
+        lines.append(f"## {day or 'Unknown date'}\n")
+        for note_name, tags, formats in sorted(added_by_date[day]):
+            extras = [_link("Collections", t) for t in tags] + [_link("Formats", f) for f in formats]
+            lines.append(f"- {_link('Movies', note_name)}" + (f" — {', '.join(extras)}" if extras else ""))
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _stats_note(rows, db: DB) -> str:
